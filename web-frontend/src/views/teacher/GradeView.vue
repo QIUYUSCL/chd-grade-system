@@ -3,18 +3,32 @@
     <h2>成绩查看</h2>
 
     <!-- 查询条件卡片 -->
+    <!-- 查询条件卡片 -->
     <el-card class="query-card">
       <el-form :inline="true" :model="queryForm" class="query-form">
         <el-form-item label="学期" prop="semester">
           <el-input v-model="queryForm.semester" placeholder="如: 2024-2025-1" clearable />
         </el-form-item>
+
+        <!-- 课程选择（动态加载） -->
         <el-form-item label="课程" prop="courseId">
-          <el-select v-model="queryForm.courseId" placeholder="请选择课程" clearable>
-            <el-option label="数据结构" value="CS202" />
-            <el-option label="操作系统" value="CS303" />
-            <el-option label="计算机网络" value="CS404" />
+          <el-select
+              v-model="queryForm.courseId"
+              placeholder="请选择课程"
+              clearable
+              :loading="courseLoading"
+              :disabled="courseLoading || courses.length === 0">
+            <el-option
+                v-for="course in courses"
+                :key="course.course_id"
+                :label="course.course_name + ' (' + course.course_id + ')'"
+                :value="course.course_id" />
           </el-select>
+          <span v-if="courses.length === 0 && !courseLoading" style="color: #909399; font-size: 12px;">
+            暂无任课课程
+          </span>
         </el-form-item>
+
         <el-form-item>
           <el-button type="primary" @click="handleQuery" :loading="loading">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
@@ -79,12 +93,75 @@ const queryForm = reactive({
   courseId: ''
 })
 
+// 课程列表
+const courses = ref([])
+const courseLoading = ref(false)
+
 // 表格数据
 const gradeList = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+
+// 加载教师课程列表
+const loadTeacherCourses = async () => {
+  courseLoading.value = true
+  try {
+    const res = await request.get('/remote/client/teacher/courses')
+    if (res.code === 200 && res.data) {
+      courses.value = res.data
+      if (courses.value.length === 0) {
+        ElMessage.warning('您暂未分配任课课程，请联系管理员')
+      }
+    } else {
+      ElMessage.error('获取课程列表失败: ' + (res.message || '未知错误'))
+      courses.value = []
+    }
+  } catch (error) {
+    console.error('获取课程列表异常:', error)
+    ElMessage.error('获取课程列表失败: ' + error.message)
+    courses.value = []
+  } finally {
+    courseLoading.value = false
+  }
+}
+
+
+const submitGrade = async (status) => {
+  try {
+    await formRef.value.validate()
+    loading.value = true
+
+    // 明确传递状态
+    const submitData = {
+      studentId: form.studentId,
+      courseId: form.courseId,
+      semester: form.semester,
+      examType: form.examType,
+      dailyScore: form.dailyScore.toString(),
+      finalScore: form.finalScore.toString(),
+      totalScore: form.totalScore.toString(),
+      status: status  // ✅ SUBMITTED 或 DRAFT
+    }
+
+    console.log('提交的数据:', submitData)
+
+    const res = await request.post('/remote/client/grade/entry', submitData)
+
+    if (res.code === 200) {
+      ElMessage.success(status === 'DRAFT' ? '成绩暂存成功' : '成绩提交成功')
+      handleReset()
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    console.error('请求异常:', error)
+    ElMessage.error('请求异常: ' + error.message)
+  } finally {
+    loading.value = false
+  }
+}
 
 // 查询方法
 const handleQuery = async () => {
@@ -143,7 +220,8 @@ const getScoreTagType = (score) => {
 
 // 页面加载时自动查询
 onMounted(() => {
-  handleQuery()
+  loadTeacherCourses()  // 加载课程列表
+  handleQuery()         // 查询成绩
 })
 </script>
 

@@ -9,7 +9,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 security:
   aes:
-    secret-key: xuKeYHGwOGsPDnANisQWXMYtpRFH9hqeI4jSqXNcBa0=
+    secret-key: DqWW5+9DjS+rreSFA7MaiHiGfXUI9CjnrpHn5EJZtrA=
   jwt:
     secret: Y2hkLWdyYWRlLW1hbmFnZW1lbnQtc2VjcmV0LWtleS0yMDI1LTMyYnl0ZXM=
     expiration: 86400

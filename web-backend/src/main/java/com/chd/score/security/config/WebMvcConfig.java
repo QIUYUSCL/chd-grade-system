@@ -14,7 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/remote/client/modify/**", "/remote/client/password/change")
+                .addPathPatterns("/remote/client/**")
                 .excludePathPatterns("/remote/client/login");
     }
 }

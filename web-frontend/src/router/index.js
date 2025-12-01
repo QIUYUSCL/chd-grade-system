@@ -51,7 +51,7 @@ const routes = [
             { path: 'grade-view', component: () => import('@/views/teacher/GradeView.vue') }
         ]
     },
-    
+
 
 
 

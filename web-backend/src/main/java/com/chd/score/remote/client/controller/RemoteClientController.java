@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -135,5 +136,48 @@ public class RemoteClientController {
             return Result.error("成绩查询失败: " + e.getMessage());
         }
     }
+
+    @PostMapping("/grade/entry")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<String> entryGrade(@RequestBody Map<String, Object> gradeData,
+                                     HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
+
+        try {
+            // ✅ 明确传递状态
+            String status = (String) gradeData.get("status");
+            log.info("教师 {} 录入成绩 - 状态: {}", teacherId, status);
+
+            clientService.entryGrade(gradeData, teacherId, clientIp);
+            return Result.success("成绩录入成功");
+        } catch (Exception e) {
+            log.error("成绩录入失败 - 用户: {}, IP: {}, 异常: ", teacherId, clientIp, e);
+            return Result.error("成绩录入失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误"));
+        }
+    }
+
+
+    /**
+     * 教师获取自己的课程列表（动态加载）
+     */
+    @GetMapping("/teacher/courses")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<List<Map<String, Object>>> getTeacherCourses(HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
+
+        log.info("教师 {} 请求课程列表, IP: {}", teacherId, clientIp);
+
+        try {
+            List<Map<String, Object>> courses = clientService.getTeacherCourses(teacherId);
+            return Result.success(courses);
+        } catch (Exception e) {
+            log.error("获取课程列表失败 - 教师: {}, 错误: {}", teacherId, e.getMessage());
+            return Result.error("获取课程列表失败: " + e.getMessage());
+        }
+    }
+
+
 
 }

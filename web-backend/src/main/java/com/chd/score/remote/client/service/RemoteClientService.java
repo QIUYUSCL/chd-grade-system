@@ -9,6 +9,8 @@ import com.chd.score.security.config.JwtConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,15 +25,18 @@ public class RemoteClientService {
     private final ManipulationInterface manipulationInterface;      // 远程调用：操作接口
     private final AuditInterface auditInterface;  // 远程审计接口
     private final JwtConfig jwtConfig;
+    private final AESUtil aesUtil;
 
     public RemoteClientService(SelectInterface selectInterface,
                                ManipulationInterface manipulationInterface,
                                AuditInterface auditInterface,
-                               JwtConfig jwtConfig) {
+                               JwtConfig jwtConfig,
+                               AESUtil aesUtil) {
         this.selectInterface = selectInterface;
         this.manipulationInterface = manipulationInterface;
         this.auditInterface = auditInterface;
         this.jwtConfig = jwtConfig;
+        this.aesUtil = aesUtil;
     }
 
     /**
@@ -64,7 +69,8 @@ public class RemoteClientService {
         // 生成JWT
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userData.get("student_id") != null ?
-                userData.get("student_id") : userData.get("teacher_id"));
+                userData.get("student_id") : (userData.get("teacher_id") != null ?
+                userData.get("teacher_id") : userData.get("admin_id")));
         claims.put("role", dto.getRole());
         claims.put("name", userData.get("name"));
         claims.put("ip", clientIp);
@@ -235,10 +241,9 @@ public class RemoteClientService {
                                           int page, int pageSize, String clientIp) {
         log.info("教师 {} 查询成绩列表, 学期: {}, 课程: {}, IP: {}", teacherId, semester, courseId, clientIp);
 
-        // 1. 构建动态查询条件
+        // 1. 查询成绩记录
         Map<String, Object> conditions = new HashMap<>();
-        conditions.put("teacher_id", teacherId); // 只能查看自己录入的成绩
-
+        conditions.put("teacher_id", teacherId);
         if (semester != null && !semester.trim().isEmpty()) {
             conditions.put("semester", semester);
         }
@@ -246,7 +251,6 @@ public class RemoteClientService {
             conditions.put("course_id", courseId);
         }
 
-        // 2. 调用远程查询接口
         OperationDTO queryDTO = new OperationDTO();
         queryDTO.setOperation("SELECT");
         queryDTO.setTable("grade_records");
@@ -254,28 +258,42 @@ public class RemoteClientService {
 
         List<Map<String, Object>> gradeList = selectInterface.selectList(queryDTO);
 
-        // 3. 解密成绩数据（AES解密）
+        // ✅ 2. 批量查询关联的学生姓名和课程名称
         for (Map<String, Object> record : gradeList) {
-            String encryptedScore = (String) record.get("total_score_encrypted");
-            if (encryptedScore != null) {
-                // 调用AES解密工具
-                String decryptedScore = AESUtil.decrypt(encryptedScore);
-                record.put("total_score", decryptedScore); // 添加明文字段用于展示
-            }
+            String studentId = (String) record.get("student_id");
+            String cid = (String) record.get("course_id");
+
+            // 查询学生姓名
+            OperationDTO studentQuery = new OperationDTO();
+            studentQuery.setOperation("SELECT");
+            studentQuery.setTable("students");
+            studentQuery.setConditions(Map.of("student_id", studentId));
+            Map<String, Object> student = selectInterface.select(studentQuery);
+            record.put("student_name", student != null ? student.get("name") : "**未知学生**");
+
+            // 查询课程名称
+            OperationDTO courseQuery = new OperationDTO();
+            courseQuery.setOperation("SELECT");
+            courseQuery.setTable("courses");
+            courseQuery.setConditions(Map.of("course_id", cid));
+            Map<String, Object> course = selectInterface.select(courseQuery);
+            record.put("course_name", course != null ? course.get("course_name") : "**未知课程**");
         }
 
-        // 4. 记录审计日志（远程调用）
+        // 3. 解密成绩
+        aesUtil.decryptRecords(gradeList, "total_score_encrypted");
+
+        // 4. 审计日志
         AuditLogDTO auditLog = new AuditLogDTO();
         auditLog.setOperationType("GRADE_VIEW");
         auditLog.setTableName("grade_records");
-        auditLog.setRecordId("QUERY_LIST"); // 列表查询用特殊标识
+        auditLog.setRecordId("QUERY_LIST");
         auditLog.setOperatorId(teacherId);
         auditLog.setOperatorType("TEACHER");
         auditLog.setClientIp(clientIp);
-
         auditInterface.logOperation(auditLog);
 
-        // 5. 手动分页（实际生产建议SQL分页）
+        // 5. 手动分页
         int total = gradeList.size();
         int fromIndex = (page - 1) * pageSize;
         int toIndex = Math.min(fromIndex + pageSize, total);
@@ -290,4 +308,150 @@ public class RemoteClientService {
 
         return result;
     }
+
+    /**
+     * 教师录入成绩（完善版）
+     * 支持分项成绩录入、自动计算总分、支持补考成绩
+     */
+    public void entryGrade(Map<String, Object> gradeData, String teacherId, String clientIp) {
+        // 1. 参数校验（增强版）
+        String studentId = (String) gradeData.get("studentId");
+        String courseId = (String) gradeData.get("courseId");
+        String semester = (String) gradeData.get("semester");
+        String examType = (String) gradeData.get("examType");
+        String dailyScore = (String) gradeData.get("dailyScore");
+        String finalScore = (String) gradeData.get("finalScore");
+        String totalScore = (String) gradeData.get("totalScore");
+        String makeupScore = (String) gradeData.get("makeupScore");
+
+        // 校验必填字段
+        validateNotEmpty(studentId, "学生ID");
+        validateNotEmpty(courseId, "课程ID");
+        validateNotEmpty(semester, "学期");
+        validateNotEmpty(examType, "考试类型");
+        validateNotEmpty(dailyScore, "平时成绩");
+        validateNotEmpty(finalScore, "期末成绩");
+        validateNotEmpty(totalScore, "总成绩");
+
+        // 校验考试类型
+        if (!"正考".equals(examType) && !"补考".equals(examType)) {
+            throw new RuntimeException("无效的考试类型: " + examType);
+        }
+
+        // 获取前端传入的状态（默认为DRAFT）
+        String status = (String) gradeData.get("status");
+        if (status == null || status.trim().isEmpty()) {
+            status = "DRAFT"; // 默认状态
+        }
+
+        if (!"DRAFT".equals(status) && !"SUBMITTED".equals(status)) {
+            throw new RuntimeException("无效的状态: " + status);
+        }
+
+
+
+
+        // 2. 验证关联数据是否存在
+        validateExists("students", "student_id", studentId, "学生");
+        validateExists("courses", "course_id", courseId, "课程");
+
+        // 3. 加密各项成绩
+        String encryptedDaily = aesUtil.encrypt(dailyScore);
+        String encryptedFinal = aesUtil.encrypt(finalScore);
+        String encryptedTotal = aesUtil.encrypt(totalScore);
+        String encryptedMakeup = null;
+        if ("补考".equals(examType) && makeupScore != null) {
+            encryptedMakeup = aesUtil.encrypt(makeupScore);
+        }
+
+        // 4. 构建插入数据
+        Map<String, Object> insertData = new HashMap<>();
+        insertData.put("student_id", studentId);
+        insertData.put("course_id", courseId);
+        insertData.put("teacher_id", teacherId);
+        insertData.put("daily_score_encrypted", encryptedDaily);
+        insertData.put("final_score_encrypted", encryptedFinal);
+        insertData.put("total_score_encrypted", encryptedTotal);
+        insertData.put("makeup_score_encrypted", encryptedMakeup);
+        insertData.put("exam_type", examType);
+        insertData.put("status", status);
+        insertData.put("semester", semester);
+
+
+
+        // 5. 构建插入DTO
+        OperationDTO insertDTO = new OperationDTO();
+        insertDTO.setOperation("INSERT");
+        insertDTO.setTable("grade_records");
+        insertDTO.setData(insertData);
+
+        // 6. 执行插入
+        boolean success;
+        try {
+            success = manipulationInterface.insert(insertDTO);
+        } catch (Exception e) {
+            log.error("远程插入成绩失败 - 学生: {}, 课程: {}, 异常: {}", studentId, courseId, e.getMessage(), e);
+            throw new RuntimeException("成绩录入失败: " + e.getMessage());
+        }
+
+        // 7. 记录审计日志
+        if (success) {
+            AuditLogDTO auditLog = new AuditLogDTO();
+            auditLog.setOperationType("GRADE_ENTRY");
+            auditLog.setTableName("grade_records");
+            auditLog.setRecordId(studentId + "_" + courseId + "_" + examType);
+            auditLog.setOperatorId(teacherId);
+            auditLog.setOperatorType("TEACHER");
+            auditLog.setClientIp(clientIp);
+
+            auditInterface.logOperation(auditLog);
+            log.info("教师 {} 录入成绩成功: 学生={}, 课程={}, 类型={}, 总分={}",
+                    teacherId, studentId, courseId, examType, totalScore);
+        } else {
+            throw new RuntimeException("数据库插入失败，返回结果为false");
+        }
+    }
+
+    // 辅助方法：验证字段非空
+    private void validateNotEmpty(String value, String fieldName) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new RuntimeException(fieldName + "不能为空");
+        }
+    }
+
+    // 辅助方法：验证数据存在性
+    private void validateExists(String table, String field, String value, String entityName) {
+        OperationDTO queryDTO = new OperationDTO();
+        queryDTO.setOperation("SELECT");
+        queryDTO.setTable(table);
+        queryDTO.setConditions(Map.of(field, value));
+
+        Map<String, Object> result = selectInterface.select(queryDTO);
+        if (result == null || result.isEmpty()) {
+            throw new RuntimeException(entityName + "不存在: " + value);
+        }
+    }
+
+    /**
+     * 获取当前教师教授的课程列表
+     * @param teacherId 教师ID
+     * @return 课程列表（包含course_id和course_name）
+     */
+    public List<Map<String, Object>> getTeacherCourses(String teacherId) {
+        log.info("教师 {} 查询任课课程列表", teacherId);
+
+        // 构建查询条件
+        OperationDTO queryDTO = new OperationDTO();
+        queryDTO.setOperation("SELECT");
+        queryDTO.setTable("courses");
+        queryDTO.setConditions(Map.of("teacher_id", teacherId));
+
+        // 调用远程查询接口
+        List<Map<String, Object>> courses = selectInterface.selectList(queryDTO);
+
+        log.info("查询到 {} 门课程", courses != null ? courses.size() : 0);
+        return courses != null ? courses : new ArrayList<>();
+    }
+
+
 }
