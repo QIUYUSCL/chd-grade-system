@@ -1,0 +1,54 @@
+web-frontend/（对应“Web前端网络设计”）
+├── public/                # 静态资源（图标、打印模板）
+├── src/
+│   ├── api/               # Axios请求封装（按模块划分：user.js、score.js、course.js）
+│   ├── assets/            # 样式、图片资源
+│   ├── components/        # 公共组件（分页、打印组件、成绩卡片、XSS过滤组件）
+│   ├── router/            # 路由配置（角色路由守卫，控制教师/学生/管理员菜单可见性）
+│   ├── store/             # Pinia状态管理（用户信息、权限标识、全局配置）
+│   ├── views/             # 页面视图（按角色划分）
+│   │   ├── teacher/       # 教师端：成绩录入（含系数设置）、成绩分析表、往年成绩查询
+│   │   ├── student/       # 学生端：成绩查看（正考/补考格式）、排名、挂科统计
+│   │   ├── admin/         # 管理员端：成绩管理（小撤销/大撤销）、人员维护、权限分配、安全日志
+│   │   └── login/         # 登录页面（JWT认证）
+│   ├── utils/             # 工具类（加密、XSS过滤、日期格式化、打印工具）
+│   ├── App.vue            # 根组件
+│   └── main.js            # 入口文件（配置HTTPS请求、全局组件注册）
+├── package.json           # 依赖配置
+└── vite.config.js         # 构建配置（强制HTTPS，禁用前端SQL拼接）
+
+web-backend/（对应“Web后端网络设计”）
+├── src/
+│   ├── main/
+│   │   ├── java/com/chd/score/
+│   │   │   ├── ScoreApplication.java          # 应用入口
+│   │   │   ├── remote/                        # 远程方法调用模块（核心）
+│   │   │   │   ├── client/                    # 远程调用客户端（文档要求）
+│   │   │   │   │   ├── dto/                   # 数据传输对象（封装字段、表名、SQL类型）
+│   │   │   │   │   ├── controller/            # 接收前端HTTPS请求的统一入口
+│   │   │   │   │   └── RemoteClientService.java # 核心：数据封装、调用服务端接口
+│   │   │   │   └── server/                    # 远程调用服务端（文档要求）
+│   │   │   │       ├── interface/             # 服务端接口（SelectInterface、ManipulationInterface）
+│   │   │   │       ├── impl/                  # 接口实现：SQL拼接、事务处理、多库适配
+│   │   │   │       └── config/                # WebService发布配置、数据源适配配置
+│   │   │   ├── module/                        # 业务模块
+│   │   │   │   ├── user/                      # 用户管理（身份认证、角色权限）
+│   │   │   │   ├── course/                    # 课程管理（学年学期、课程查询）
+│   │   │   │   ├── score/                     # 成绩管理（核心业务：录入、计算、撤销）
+│   │   │   │   └── log/                       # 安全审计日志（敏感操作记录）
+│   │   │   ├── security/                      # 安全设计模块（对应“安全设计”目录）
+│   │   │   │   ├── config/                    # Spring Security + JWT配置、HTTPS配置
+│   │   │   │   ├── encryption/                # 加密工具类（AES、RSA、BCrypt）
+│   │   │   │   ├── aop/                       # 安全审计切面（记录操作日志）
+│   │   │   │   ├── filter/                    # 防护过滤器（XSS、SQL注入、权限校验）
+│   │   │   │   └── blockchain/                # 可选：区块链操作记录（文档去中心化安全）
+│   │   │   ├── common/                        # 公共模块（统一返回结果、异常处理、常量）
+│   │   │   └── config/                        # 全局配置（跨域、多数据源、事务管理器）
+│   │   └── resources/
+│   │       ├── application.yml                # 主配置（JWT、WebService、日志）
+│   │       ├── application-mysql.yml          # MySQL数据源配置
+│   │       ├── application-sqlserver.yml      # 预留SQLServer适配配置
+│   │       └── mapper/                        # MyBatis XML映射文件（数据访问层）
+│   └── test/                                  # 测试代码（功能测试、安全测试、远程调用测试）
+├── pom.xml                                    # Maven依赖
+└── sonar-project.properties                   # SonarQube代码分析配置

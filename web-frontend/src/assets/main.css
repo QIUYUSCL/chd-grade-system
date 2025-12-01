@@ -1,0 +1,50 @@
+@import './base.css'; /* main.css */
+
+/* 全局重置 */
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 基础样式 */
+
+/* 登录页特殊样式 - 保持居中 */
+.login-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 主应用内容区域 - 移除宽度限制 */
+#app {
+  font-weight: normal;
+  width: 100%;
+  height: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 链接样式 */
+a, .green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
