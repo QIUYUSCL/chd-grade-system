@@ -11,6 +11,13 @@ const routes = [
         path: '/',
         redirect: '/login'
     },
+    {
+        path: '/password/change',
+        name: 'ChangePassword',
+        component: () => import('@/components/ChangePassword.vue'),
+        meta: { requiresAuth: true } // 需要登录
+    },
+
     // 通用个人信息页面
     {
         path: '/profile',
@@ -20,6 +27,8 @@ const routes = [
             { path: '', component: () => import('@/components/common/Profile.vue') }
         ]
     },
+
+
     // 学生相关路由
     {
         path: '/student',
@@ -29,15 +38,24 @@ const routes = [
             { path: 'grades', component: () => import('@/views/student/GradeView.vue') }
         ]
     },
+
+
+
     // 教师相关路由
     {
         path: '/teacher',
         component: () => import('@/components/common/Layout.vue'),
         meta: { requiresAuth: true, roles: ['TEACHER'] },
         children: [
-            { path: 'entry', component: () => import('@/views/teacher/ScoreEntry.vue') }
+            { path: 'entry', component: () => import('@/views/teacher/ScoreEntry.vue') },
+            { path: 'grade-view', component: () => import('@/views/teacher/GradeView.vue') }
         ]
     },
+    
+
+
+
+
     // 管理员相关路由
     {
         path: '/admin',
@@ -48,11 +66,18 @@ const routes = [
         ]
     },
     {
-        path: '/password/change',
-        name: 'ChangePassword',
-        component: () => import('@/components/ChangePassword.vue'),
-        meta: { requiresAuth: true } // 需要登录
+        path: '/admin/users',
+        name: 'UserList',
+        component: () => import('@/views/admin/UserList.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
     },
+    {
+        path: '/admin/password-reset',
+        name: 'PasswordReset',
+        component: () => import('@/views/admin/PasswordReset.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
+    }
+
 ]
 
 const router = createRouter({
@@ -61,25 +86,15 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-    const userStore = useUserStore()
+    const userStore = useUserStore();
 
-    if (to.path === '/login') {
-        next()
-        return
+    if (to.meta.requiresAuth && !userStore.isAuthenticated) {
+        next('/login');
+    } else if (to.meta.requiresAdmin && !userStore.isAdmin) {
+        next('/'); // 非管理员跳转首页
+    } else {
+        next();
     }
-
-    if (!userStore.isAuthenticated()) {
-        next('/login')
-        return
-    }
-
-    const requiredRoles = to.meta.roles
-    if (requiredRoles && !requiredRoles.includes(userStore.userInfo.role)) {
-        next('/login')
-        return
-    }
-
-    next()
-})
+});
 
 export default router

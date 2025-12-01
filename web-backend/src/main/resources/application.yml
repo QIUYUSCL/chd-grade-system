@@ -7,10 +7,12 @@ spring:
     username: root
     password: Scl03282219
     driver-class-name: com.mysql.cj.jdbc.Driver
-
-jwt:
-  secret: Y2hkLWdyYWRlLW1hbmFnZW1lbnQtc2VjcmV0LWtleS0yMDI1LTMyYnl0ZXM=
-  expiration: 86400
+security:
+  aes:
+    secret-key: xuKeYHGwOGsPDnANisQWXMYtpRFH9hqeI4jSqXNcBa0=
+  jwt:
+    secret: Y2hkLWdyYWRlLW1hbmFnZW1lbnQtc2VjcmV0LWtleS0yMDI1LTMyYnl0ZXM=
+    expiration: 86400
 
 logging:
   level:

@@ -25,13 +25,4 @@ public class BCryptUtil {
         return result;
     }
 
-
-    public static void main(String[] args) {
-        String password = "111111";
-        String hash = hash(password);
-        System.out.println("========================================");
-        System.out.println("明文密码: " + password);
-        System.out.println("BCrypt 哈希: " + hash);
-        System.out.println("========================================");
-    }
 }

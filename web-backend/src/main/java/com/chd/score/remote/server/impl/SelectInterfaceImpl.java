@@ -4,6 +4,7 @@ import com.chd.score.remote.client.dto.OperationDTO;
 import com.chd.score.remote.server.Interface.SelectInterface;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -22,6 +23,13 @@ public class SelectInterfaceImpl implements SelectInterface {
         return jdbcTemplate.queryForMap(sql);
     }
 
+    @Override
+    public List<Map<String, Object>> selectList(OperationDTO dto) {
+        validateTableName(dto.getTable());
+        String sql = buildSelectSQL(dto);
+        return jdbcTemplate.queryForList(sql);
+    }
+
     private String buildSelectSQL(OperationDTO dto) {
         StringBuilder sql = new StringBuilder("SELECT * FROM " + dto.getTable());
 
@@ -34,13 +42,14 @@ public class SelectInterfaceImpl implements SelectInterface {
                     sql.append(key).append(" = ").append(value).append(" AND ");
                 }
             });
-            sql.setLength(sql.length() - 5);
+            sql.setLength(sql.length() - 5); // 移除最后的AND
         }
         return sql.toString();
     }
 
     private void validateTableName(String table) {
-        if (!table.matches("^(students|teachers|admins)$")) {
+        // ✅ 扩展支持成绩相关表
+        if (!table.matches("^(students|teachers|admins|grade_records|courses)$")) {
             throw new RuntimeException("非法表名: " + table);
         }
     }

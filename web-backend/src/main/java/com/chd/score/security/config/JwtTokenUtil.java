@@ -13,7 +13,7 @@ import java.util.Base64;
 public class JwtTokenUtil {
     private static final Logger log = LoggerFactory.getLogger(JwtTokenUtil.class);
 
-    @Value("${jwt.secret}")
+    @Value("${security.jwt.secret}")
     private String secret;
 
     // 从 Token 中获取 Claims

@@ -24,17 +24,80 @@ public class RemoteClientController {
         this.clientService = clientService;
     }
 
-
+    /**
+     * 登录接口（无需权限验证）
+     */
     @PostMapping("/login")
     public Result<String> login(@Valid @RequestBody OperationDTO dto, HttpServletRequest request) {
-        log.info("收到登录请求: {}", dto);  // 打印请求体
-        log.info("请求IP: {}", getClientIp(request));
-
+        log.info("收到登录请求: {}", dto);
         String clientIp = getClientIp(request);
         String token = clientService.executeLogin(dto, clientIp);
         log.info("登录成功, Token长度: {}", token.length());
-
         return Result.success(token);
+    }
+
+    /**
+     * 普通用户修改自己的密码（需登录验证）
+     * @param params 包含 oldPassword 和 newPassword
+     * @param request 自动获取当前登录用户信息
+     */
+    @PostMapping("/password/change")
+    @RequirePermission(roles = {"STUDENT", "TEACHER", "ADMIN"})
+    public Result<String> changePassword(@RequestBody Map<String, String> params, HttpServletRequest request) {
+        String oldPassword = params.get("oldPassword");
+        String newPassword = params.get("newPassword");
+
+        // 从Token中获取当前用户信息（拦截器已验证并设置）
+        String userId = (String) request.getAttribute("userId");
+        String role = (String) request.getAttribute("userRole");
+        String clientIp = getClientIp(request);
+
+        log.info("用户 {} 请求修改密码, IP: {}", userId, clientIp);
+
+        try {
+            boolean success = clientService.changePassword(oldPassword, newPassword, userId, role, clientIp);
+            return success ? Result.success("密码修改成功，请重新登录") : Result.error("密码修改失败");
+        } catch (RuntimeException e) {
+            log.error("密码修改失败: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员重置他人密码（无需旧密码，直接重置）
+     * @param params 包含 targetUserId, targetRole, newPassword
+     * @param request 自动获取当前管理员信息
+     */
+    @PostMapping("/password/admin/reset")
+    @RequirePermission(roles = {"ADMIN"})
+    public Result<String> adminResetPassword(@RequestBody Map<String, String> params, HttpServletRequest request) {
+        String targetUserId = params.get("targetUserId");
+        String targetRole = params.get("targetRole");
+        String newPassword = params.get("newPassword");
+
+        String adminId = (String) request.getAttribute("userId");
+        String adminIp = getClientIp(request);
+
+        log.warn("管理员 {} 正在重置用户 {} ({}) 的密码，IP: {}", adminId, targetUserId, targetRole, adminIp);
+
+        try {
+            // 权限二次校验（防止水平越权）
+            if (!"ADMIN".equals(request.getAttribute("userRole"))) {
+                return Result.error("仅管理员可操作");
+            }
+
+            boolean success = clientService.adminResetPassword(targetUserId, targetRole, newPassword, adminId, adminIp);
+
+            if (success) {
+                log.warn("安全审计：管理员 {} 成功重置用户 {} 密码", adminId, targetUserId);
+                return Result.success("密码重置成功，已记录审计日志");
+            } else {
+                return Result.error("密码重置失败");
+            }
+        } catch (RuntimeException e) {
+            log.error("管理员重置密码失败: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        }
     }
 
     private String getClientIp(HttpServletRequest request) {
@@ -46,32 +109,30 @@ public class RemoteClientController {
     }
 
     /**
-     * 修改密码接口（需要登录）
+     * 教师查看成绩列表（分页）
+     * @param semester 学期筛选
+     * @param courseId 课程筛选
+     * @param page 页码，默认1
+     * @param pageSize 每页条数，默认10
      */
-    @PostMapping("/password/change")
-    @RequirePermission(roles = {"STUDENT", "TEACHER", "ADMIN"})
-    public Result<String> changePassword(@RequestBody Map<String, String> params, HttpServletRequest request) {
-        String oldPassword = params.get("oldPassword");
-        String newPassword = params.get("newPassword");
+    @GetMapping("/grade/view")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<Map<String, Object>> viewGrades(
+            @RequestParam(required = false) String semester,
+            @RequestParam(required = false) String courseId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize,
+            HttpServletRequest request) {
 
-        // 从请求属性获取用户信息（拦截器已验证并设置）
-        String userId = (String) request.getAttribute("userId");
-        String role = (String) request.getAttribute("userRole");
-        String clientIp = getClientIp(request); // 获取客户端IP
-
-        log.info("用户 {} 请求修改密码, IP: {}", userId, clientIp);
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
 
         try {
-            boolean success = clientService.changePassword(oldPassword, newPassword, userId, role, clientIp);
-            if (success) {
-                log.info("用户 {} 密码修改成功", userId);
-                return Result.success("密码修改成功");
-            } else {
-                return Result.error("密码修改失败");
-            }
+            Map<String, Object> result = clientService.viewGrades(teacherId, semester, courseId, page, pageSize, clientIp);
+            return Result.success(result);
         } catch (RuntimeException e) {
-            log.error("密码修改失败: {}", e.getMessage());
-            return Result.error(e.getMessage());
+            log.error("成绩查看失败 - 教师: {}, 错误: {}", teacherId, e.getMessage());
+            return Result.error("成绩查询失败: " + e.getMessage());
         }
     }
 

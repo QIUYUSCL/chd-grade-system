@@ -119,7 +119,8 @@ const menuItems = computed(() => {
       { index: '/student/grades', label: '成绩查询', icon: View }
     ],
     'TEACHER': [
-      { index: '/teacher/entry', label: '成绩录入', icon: Edit }
+      { index: '/teacher/entry', label: '成绩录入', icon: Edit },
+      { index: '/teacher/grade-view', label: '成绩查询', icon: View }
     ],
     'ADMIN': [
       { index: '/admin/management', label: '系统管理', icon: Setting }
