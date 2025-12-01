@@ -33,13 +33,16 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
         // SET 子句
         data.forEach((key, value) -> {
             sql.append(key).append(" = ");
-            if (value instanceof String) {
+            // 检查是否是SQL函数
+            if (value instanceof String && "NOW()".equals(value)) {
+                sql.append("NOW(), "); // 直接拼函数，不加引号
+            } else if (value instanceof String) {
                 sql.append("'").append(value).append("', ");
             } else {
                 sql.append(value).append(", ");
             }
         });
-        sql.setLength(sql.length() - 2); // 移除最后一个逗号
+        sql.setLength(sql.length() - 2);
 
         // WHERE 子句
         sql.append(" WHERE ");

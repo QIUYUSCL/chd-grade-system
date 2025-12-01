@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -179,5 +180,51 @@ public class RemoteClientController {
     }
 
 
+
+
+    @PostMapping("/grade/update")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<String> updateGrade(@RequestBody Map<String, Object> params,
+                                      HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
+
+        // 安全地获取 recordId
+        Object recordIdObj = params.get("recordId");
+        String recordId = recordIdObj != null ? recordIdObj.toString() : null;
+
+        // ✅ 获取明文数据（非encrypted后缀）
+        Map<String, Object> gradeData = params.get("data") instanceof Map
+                ? (Map<String, Object>) params.get("data")
+                : new HashMap<>();
+
+        // 参数校验
+        if (recordId == null || recordId.isEmpty()) {
+            return Result.error("记录ID不能为空");
+        }
+        if (gradeData.isEmpty()) {
+            return Result.error("更新数据不能为空");
+        }
+
+        try {
+            // ✅ 提取明文成绩字段
+            String dailyScore = (String) gradeData.get("daily_score");
+            String finalScore = (String) gradeData.get("final_score");
+            String totalScore = (String) gradeData.get("total_score");
+            String makeupScore = (String) gradeData.get("makeup_score");
+            String status = (String) gradeData.get("status");
+
+            // ✅ 调用新的Service方法，传入明文
+            boolean success = clientService.updateGradeWithEncryption(
+                    recordId, dailyScore, finalScore, totalScore, makeupScore,
+                    status, teacherId, clientIp);
+
+            return success ? Result.success("成绩修改成功") : Result.error("成绩修改失败");
+        } catch (Exception e) {
+            log.error("成绩修改失败 - recordId: {}, teacherId: {}, 错误: {}",
+                    recordId, teacherId, e.getMessage(), e);
+            return Result.error("成绩修改失败: " + e.getMessage());
+        }
+    }
 
 }

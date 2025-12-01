@@ -258,7 +258,7 @@ public class RemoteClientService {
 
         List<Map<String, Object>> gradeList = selectInterface.selectList(queryDTO);
 
-        // ✅ 2. 批量查询关联的学生姓名和课程名称
+        // 2. 批量查询关联的学生姓名和课程名称
         for (Map<String, Object> record : gradeList) {
             String studentId = (String) record.get("student_id");
             String cid = (String) record.get("course_id");
@@ -347,8 +347,6 @@ public class RemoteClientService {
         if (!"DRAFT".equals(status) && !"SUBMITTED".equals(status)) {
             throw new RuntimeException("无效的状态: " + status);
         }
-
-
 
 
         // 2. 验证关联数据是否存在
@@ -454,4 +452,68 @@ public class RemoteClientService {
     }
 
 
+    /**
+     * 修改成绩（仅暂存状态可修改）- 支持自动加密
+     */
+    public boolean updateGradeWithEncryption(String recordId, String dailyScore, String finalScore,
+                                             String totalScore, String makeupScore, String status,
+                                             String teacherId, String clientIp) {
+        log.info("教师 {} 修改成绩记录: {}", teacherId, recordId);
+
+        // 1. 验证记录是否存在且属于该教师
+        OperationDTO queryDTO = new OperationDTO();
+        queryDTO.setOperation("SELECT");
+        queryDTO.setTable("grade_records");
+        queryDTO.setConditions(Map.of("record_id", recordId, "teacher_id", teacherId));
+
+        Map<String, Object> record = selectInterface.select(queryDTO);
+        if (record == null || record.isEmpty()) {
+            throw new RuntimeException("未找到该成绩记录或无权修改");
+        }
+
+        // 2. 验证状态必须为DRAFT
+        String currentStatus = (String) record.get("status");
+        if (!"DRAFT".equals(currentStatus)) {
+            throw new RuntimeException("只有暂存状态的成绩才能修改");
+        }
+
+        // ✅ 3. 构建加密的更新数据
+        Map<String, Object> encryptedData = new HashMap<>();
+        encryptedData.put("daily_score_encrypted", aesUtil.encrypt(dailyScore));
+        encryptedData.put("final_score_encrypted", aesUtil.encrypt(finalScore));
+        encryptedData.put("total_score_encrypted", aesUtil.encrypt(totalScore));
+
+        // 补考成绩可选
+        if (makeupScore != null && !makeupScore.trim().isEmpty()) {
+            encryptedData.put("makeup_score_encrypted", aesUtil.encrypt(makeupScore));
+        }
+
+        encryptedData.put("status", status); // 状态字段不加密
+        encryptedData.put("updated_at", "NOW()"); // 更新时间
+
+        // 4. 执行更新
+        OperationDTO updateDTO = new OperationDTO();
+        updateDTO.setOperation("UPDATE");
+        updateDTO.setTable("grade_records");
+        updateDTO.setData(encryptedData);
+        updateDTO.setConditions(Map.of("record_id", recordId));
+
+        boolean success = manipulationInterface.update(updateDTO);
+
+        // 5. 记录审计日志
+        if (success) {
+            AuditLogDTO auditLog = new AuditLogDTO();
+            auditLog.setOperationType("GRADE_UPDATE");
+            auditLog.setTableName("grade_records");
+            auditLog.setRecordId(recordId);
+            auditLog.setOperatorId(teacherId);
+            auditLog.setOperatorType("TEACHER");
+            auditLog.setClientIp(clientIp);
+            auditInterface.logOperation(auditLog);
+
+            log.info("教师 {} 成功修改成绩记录: {}", teacherId, recordId);
+        }
+
+        return success;
+    }
 }
