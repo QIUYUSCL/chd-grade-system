@@ -154,15 +154,26 @@
         <el-button type="primary" @click="submitEdit" :loading="editLoading">
           保存修改
         </el-button>
+
+        <!-- 新增：提交成绩 -->
+        <el-button
+            type="success"
+            @click="submitAndCommit"
+            :loading="editLoading"
+            :disabled="!isFormValid">
+          提交成绩
+        </el-button>
+
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import {ref, reactive, onMounted, nextTick, watch} from 'vue'  // ✅ 导入 nextTick
-import { ElMessage } from 'element-plus'
+import {ref, reactive, onMounted, nextTick, watch, computed} from 'vue'  // ✅ 导入 nextTick
+import { ElMessage  } from 'element-plus'
 import request from '@/utils/request'
+import { ElMessageBox } from 'element-plus'
 
 // 查询表单
 const queryForm = reactive({
@@ -199,6 +210,16 @@ const editForm = reactive({
   finalScore: null,
   makeupScore: null,
   totalScore: null
+})
+
+// 在editForm定义后添加
+const isFormValid = computed(() => {
+  return editForm.dailyScore != null &&
+      editForm.finalScore != null &&
+      editForm.totalScore != null &&
+      !isNaN(editForm.dailyScore) &&
+      !isNaN(editForm.finalScore) &&
+      !isNaN(editForm.totalScore)
 })
 
 const editRules = {
@@ -354,7 +375,7 @@ const submitEdit = async () => {
 
     editLoading.value = true
 
-    // ✅ 发送明文成绩字段，让后端统一加密
+    // 发送明文成绩字段，让后端统一加密
     const updateData = {
       daily_score: editForm.dailyScore.toString(),
       final_score: editForm.finalScore.toString(),
@@ -367,7 +388,7 @@ const submitEdit = async () => {
       updateData.makeup_score = editForm.makeupScore.toString()
     }
 
-    // ✅ 关键修复：recordId 转换为字符串
+    // 关键修复：recordId 转换为字符串
     const res = await request.post('/remote/client/grade/update', {
       recordId: String(editForm.record_id),
       data: updateData  // ✅ 明文数据
@@ -390,6 +411,72 @@ const submitEdit = async () => {
     editLoading.value = false
   }
 }
+
+const submitAndCommit = async () => {
+  try {
+    // 1. 表单验证
+    await editFormRef.value.validate()
+
+    // 2. 二次确认
+    await ElMessageBox.confirm(
+        '提交后成绩将被锁定，无法再次修改，确定要提交吗？',
+        '提交确认',
+        {
+          confirmButtonText: '确定提交',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+    )
+
+    if ([editForm.dailyScore, editForm.finalScore, editForm.totalScore].some(v => v == null || isNaN(v))) {
+      ElMessage.error('所有成绩分数都必须填写且为有效数字')
+      return
+    }
+
+    editLoading.value = true
+
+    // 3. 发送明文成绩字段，状态设置为SUBMITTED
+    const updateData = {
+      daily_score: editForm.dailyScore.toString(),
+      final_score: editForm.finalScore.toString(),
+      total_score: editForm.totalScore.toString(),
+      status: 'SUBMITTED'  // ✅ 关键：状态改为已提交
+    }
+
+    // 补考成绩处理
+    if (editForm.exam_type === '补考' && editForm.makeupScore != null) {
+      updateData.makeup_score = editForm.makeupScore.toString()
+    }
+
+    const res = await request.post('/remote/client/grade/update', {
+      recordId: String(editForm.record_id),
+      data: updateData
+    })
+
+    if (res.code === 200) {
+      ElMessage.success('成绩提交成功！记录已锁定')
+      editDialogVisible.value = false
+      handleQuery() // 刷新列表
+    } else {
+      ElMessage.error(res.message || '提交失败')
+    }
+  } catch (error) {
+    // 处理取消确认
+    if (error === 'cancel') {
+      ElMessage.info('已取消提交')
+      return
+    }
+
+    if (error.response?.status === 403) {
+      ElMessage.error('权限验证失败或数据格式错误')
+    } else {
+      ElMessage.error(error.message || '提交异常')
+    }
+  } finally {
+    editLoading.value = false
+  }
+}
+
 
 const encryptScore = async (score) => {
   // 处理 null、undefined、NaN 等情况
