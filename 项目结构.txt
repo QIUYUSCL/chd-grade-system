@@ -17,38 +17,55 @@ web-frontend/（对应“Web前端网络设计”）
 ├── package.json           # 依赖配置
 └── vite.config.js         # 构建配置（强制HTTPS，禁用前端SQL拼接）
 
-web-backend/（对应“Web后端网络设计”）
-├── src/
-│   ├── main/
-│   │   ├── java/com/chd/score/
-│   │   │   ├── ScoreApplication.java          # 应用入口
-│   │   │   ├── remote/                        # 远程方法调用模块（核心）
-│   │   │   │   ├── client/                    # 远程调用客户端（文档要求）
-│   │   │   │   │   ├── dto/                   # 数据传输对象（封装字段、表名、SQL类型）
-│   │   │   │   │   ├── controller/            # 接收前端HTTPS请求的统一入口
-│   │   │   │   │   └── RemoteClientService.java # 核心：数据封装、调用服务端接口
-│   │   │   │   └── server/                    # 远程调用服务端（文档要求）
-│   │   │   │       ├── interface/             # 服务端接口（SelectInterface、ManipulationInterface）
-│   │   │   │       ├── impl/                  # 接口实现：SQL拼接、事务处理、多库适配
-│   │   │   │       └── config/                # WebService发布配置、数据源适配配置
-│   │   │   ├── module/                        # 业务模块
-│   │   │   │   ├── user/                      # 用户管理（身份认证、角色权限）
-│   │   │   │   ├── course/                    # 课程管理（学年学期、课程查询）
-│   │   │   │   ├── score/                     # 成绩管理（核心业务：录入、计算、撤销）
-│   │   │   │   └── log/                       # 安全审计日志（敏感操作记录）
-│   │   │   ├── security/                      # 安全设计模块（对应“安全设计”目录）
-│   │   │   │   ├── config/                    # Spring Security + JWT配置、HTTPS配置
-│   │   │   │   ├── encryption/                # 加密工具类（AES、RSA、BCrypt）
-│   │   │   │   ├── aop/                       # 安全审计切面（记录操作日志）
-│   │   │   │   ├── filter/                    # 防护过滤器（XSS、SQL注入、权限校验）
-│   │   │   │   └── blockchain/                # 可选：区块链操作记录（文档去中心化安全）
-│   │   │   ├── common/                        # 公共模块（统一返回结果、异常处理、常量）
-│   │   │   └── config/                        # 全局配置（跨域、多数据源、事务管理器）
-│   │   └── resources/
-│   │       ├── application.yml                # 主配置（JWT、WebService、日志）
-│   │       ├── application-mysql.yml          # MySQL数据源配置
-│   │       ├── application-sqlserver.yml      # 预留SQLServer适配配置
-│   │       └── mapper/                        # MyBatis XML映射文件（数据访问层）
-│   └── test/                                  # 测试代码（功能测试、安全测试、远程调用测试）
-├── pom.xml                                    # Maven依赖
-└── sonar-project.properties                   # SonarQube代码分析配置
+web-backend/
+├── Client/                                # [模块1] 客户端 Web 应用 (端口 8080)
+│   ├── pom.xml                            # 依赖：Spring Security, JWT, Web
+│   └── src/main/
+│       ├── resources/
+│       │   └── application.yml            # 配置：JWT密钥, AES密钥, 远程Server地址
+│       └── java/com/chd/client/
+│           ├── ClientApplication.java     # 启动类
+│           ├── config/                    # 配置类
+│           │   ├── JwtConfig.java         # JWT 生成配置
+│           │   ├── JwtTokenUtil.java      # JWT 解析与校验工具
+│           │   ├── SecurityConfig.java    # Spring Security配置 (放行登录, CORS)
+│           │   ├── WebMvcConfig.java      # 拦截器注册
+│           │   ├── RestTemplateConfig.java# 远程调用工具配置
+│           │   ├── PermissionInterceptor.java # 权限拦截器 (解析Token, 校验角色)
+│           │   └── RequirePermission.java # 自定义权限注解 (@interface)
+│           ├── controller/
+│           │   └── RemoteClientController.java # 统一 Web 接口 (登录, 查成绩, 改密码)
+│           ├── service/
+│           │   └── RemoteClientService.java    # 核心业务逻辑 (加密处理, 调用 Server RPC)
+│           ├── dto/                       # 数据传输对象
+│           │   ├── OperationDTO.java      # 通用操作对象 (表名, 操作类型, 数据)
+│           │   └── AuditLogDTO.java       # 审计日志对象
+│           └── utils/
+│               ├── Result.java            # 统一返回结果封装
+│               ├── AESUtil.java           # AES 加解密工具 (数据加密)
+│               └── BCryptUtil.java        # BCrypt 哈希工具 (密码校验)
+│
+├── Server/                                # [模块2] 服务端 RPC 应用 (端口 8081)
+│   ├── pom.xml                            # 依赖：JDBC, MySQL Driver
+│   └── src/main/
+│       ├── resources/
+│       │   └── application.yml            # 配置：MySQL数据源, AES密钥
+│       └── java/com/chd/server/
+│           ├── ServerApplication.java     # 启动类
+│           ├── config/
+│           │   └── SecurityConfig.java    # 安全配置 (放行 /rpc/** 供内部调用)
+│           ├── controller/
+│           │   └── RpcProviderController.java # RPC 接口暴露 (/select, /insert, /update)
+│           ├── Interface/                 # 业务接口层
+│           │   ├── SelectInterface.java       # 查询接口定义
+│           │   ├── ManipulationInterface.java # 增改接口定义
+│           │   └── AuditInterface.java        # 审计接口定义
+│           ├── impl/                      # 接口实现层 (直接操作 JDBC)
+│           │   ├── SelectInterfaceImpl.java       # SQL 查询实现 (含表名校验)
+│           │   ├── ManipulationInterfaceImpl.java # SQL 拼接与执行 (INSERT/UPDATE)
+│           │   └── AuditInterfaceImpl.java        # 审计日志入库实现
+│           ├── dto/                       # 数据传输对象 (需与 Client 端保持一致)
+│           │   ├── OperationDTO.java
+│           │   └── AuditLogDTO.java
+│           └── utils/
+│               └── AESUtil.java           # AES 工具 (用于服务端解密/加密数据)

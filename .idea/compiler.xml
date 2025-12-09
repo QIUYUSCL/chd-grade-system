@@ -7,12 +7,26 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="web-backend" />
+      </profile>
+      <profile name="Annotation profile for Server" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="D:/.m2/repository/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="Server" />
+        <module name="Client" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="web-backend" target="17" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="Client" options="-parameters" />
+      <module name="Server" options="-parameters" />
       <module name="web-backend" options="-parameters" />
     </option>
   </component>

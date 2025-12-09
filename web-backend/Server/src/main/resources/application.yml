@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: grade-server
+  datasource:
+    url: jdbc:mysql://localhost:3306/chd_grade_db?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: Scl03282219
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+security:
+  aes:
+    secret-key: DqWW5+9DjS+rreSFA7MaiHiGfXUI9CjnrpHn5EJZtrA=
+
+logging:
+  level:
+    com.chd.server: DEBUG
