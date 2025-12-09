@@ -19,6 +19,10 @@
               <span>{{ menu.label }}</span>
             </el-menu-item>
           </template>
+          <el-menu-item index="/teacher/analysis">
+            <el-icon><DataLine /></el-icon>
+            <span>成绩分析</span>
+          </el-menu-item>
           <el-menu-item index="/profile">
             <el-icon><User /></el-icon>
             <span>个人中心</span>
@@ -78,7 +82,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
-import { User, Key, SwitchButton, View, Edit, Setting, CaretBottom } from '@element-plus/icons-vue'
+import {User, Key, SwitchButton, View, Edit, Setting, CaretBottom, DataLine} from '@element-plus/icons-vue'
 import ChangePassword from '@/components/ChangePassword.vue'
 
 const router = useRouter()

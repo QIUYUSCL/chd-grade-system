@@ -49,7 +49,7 @@ public class SelectInterfaceImpl implements SelectInterface {
 
     private void validateTableName(String table) {
 
-        if (!table.matches("^(students|teachers|admins|grade_records|courses|student_courses)$")) {
+        if (!table.matches("^(students|teachers|admins|grade_records|courses|student_courses|grade_analysis)$")) {
             throw new RuntimeException("非法表名: " + table);
         }
     }

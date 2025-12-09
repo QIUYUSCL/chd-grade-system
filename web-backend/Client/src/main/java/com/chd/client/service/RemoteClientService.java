@@ -470,4 +470,143 @@ public class RemoteClientService {
         }
     }
 
+    /**
+     * 计算成绩统计指标
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> calculateGradeStats(String courseId, String semester) {
+        // 1. 获取应考人数 (选课人数)
+        List<Map<String, Object>> students = getStudentsByCourse(courseId, semester);
+        int totalStudents = students.size();
+
+        // 2. 获取实考成绩记录
+        OperationDTO queryDTO = new OperationDTO();
+        queryDTO.setOperation("SELECT");
+        queryDTO.setTable("grade_records");
+        queryDTO.setConditions(Map.of("course_id", courseId, "semester", semester));
+
+        List<Map<String, Object>> records = (List<Map<String, Object>>) restTemplate.postForObject(serverUrl + "/selectList", queryDTO, List.class);
+        if (records == null) records = new ArrayList<>();
+
+        // 3. 统计指标计算
+        int realStudents = 0; // 实考人数 (有有效分数)
+        double sumScore = 0;
+        double maxScore = 0;
+        double minScore = 100; // 初始设为满分，方便找最小值
+        int passCount = 0;
+
+        // 分段统计: [0:<60, 1:60-69, 2:70-79, 3:80-89, 4:>=90]
+        int[] distribution = new int[5];
+
+        for (Map<String, Object> record : records) {
+            String encTotal = (String) record.get("total_score_encrypted");
+            // 忽略未录入或无效数据
+            if (encTotal == null) continue;
+
+            try {
+                // 解密并转为数字
+                double score = Double.parseDouble(aesUtil.decrypt(encTotal));
+
+                realStudents++;
+                sumScore += score;
+
+                if (score > maxScore) maxScore = score;
+                if (score < minScore) minScore = score;
+                if (score >= 60) passCount++;
+
+                // 统计分布
+                if (score < 60) distribution[0]++;
+                else if (score < 70) distribution[1]++;
+                else if (score < 80) distribution[2]++;
+                else if (score < 90) distribution[3]++;
+                else distribution[4]++;
+
+            } catch (Exception e) {
+                log.warn("Record {} score parse failed", record.get("record_id"));
+            }
+        }
+
+        // 修正无数据时的最小值
+        if (realStudents == 0) minScore = 0;
+
+        // 4. 封装结果
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalStudents", totalStudents); // 应考
+        stats.put("realStudents", realStudents);   // 实考
+        stats.put("missingStudents", totalStudents - realStudents); // 缺考/未录
+        stats.put("maxScore", maxScore);
+        stats.put("minScore", minScore);
+        stats.put("avgScore", realStudents > 0 ? String.format("%.2f", sumScore / realStudents) : "0.00");
+        stats.put("passRate", realStudents > 0 ? String.format("%.2f", (double)passCount * 100 / realStudents) : "0.00");
+        stats.put("distribution", distribution); // 数组
+
+        return stats;
+    }
+
+
+    /**
+     * 保存分析报告 (存在则更新，不存在则插入)
+     * 使用 MySQL 的 ON DUPLICATE KEY UPDATE 逻辑，或者先查后改
+     * 这里为了复用简单的 Insert/Update 接口，采用“先查后改”策略
+     */
+    @SuppressWarnings("unchecked")
+    public void saveAnalysis(Map<String, Object> data, String teacherId, String clientIp) {
+        String courseId = (String) data.get("courseId");
+        String semester = (String) data.get("semester");
+
+        // 1. 检查是否已存在
+        Map<String, Object> existing = getAnalysis(courseId, semester, teacherId);
+
+        // 准备数据
+        Map<String, Object> dbData = new HashMap<>();
+        dbData.put("course_id", courseId);
+        dbData.put("semester", semester);
+        dbData.put("teacher_id", teacherId);
+        dbData.put("avg_score", data.get("avgScore"));
+        dbData.put("pass_rate", data.get("passRate"));
+        dbData.put("max_score", data.get("maxScore"));
+        dbData.put("min_score", data.get("minScore"));
+        // 将数组转为JSON字符串存储 (简单处理)
+        dbData.put("distribution_json", data.get("distributionJson").toString());
+        dbData.put("analysis_content", data.get("content"));
+
+        OperationDTO dto = new OperationDTO();
+        dto.setTable("grade_analysis");
+
+        if (existing != null) {
+            // 更新
+            dto.setOperation("UPDATE");
+            dto.setData(dbData);
+            // 修正：Update 需要 Where 条件
+            dto.setConditions(Map.of("id", existing.get("id")));
+            restTemplate.postForObject(serverUrl + "/manipulate/update", dto, Boolean.class);
+        } else {
+            // 插入
+            dto.setOperation("INSERT");
+            dto.setData(dbData);
+            restTemplate.postForObject(serverUrl + "/manipulate/insert", dto, Boolean.class);
+        }
+
+        // 记录日志
+        sendAuditLog("ANALYSIS_SAVE", "grade_analysis", courseId + "_" + semester, teacherId, "TEACHER", clientIp);
+    }
+
+    /**
+     * 查询分析报告
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getAnalysis(String courseId, String semester, String teacherId) {
+        OperationDTO dto = new OperationDTO();
+        dto.setOperation("SELECT");
+        dto.setTable("grade_analysis");
+        dto.setConditions(Map.of(
+                "course_id", courseId,
+                "semester", semester,
+                "teacher_id", teacherId
+        ));
+
+        List<Map<String, Object>> list = (List<Map<String, Object>>) restTemplate.postForObject(serverUrl + "/selectList", dto, List.class);
+        return (list != null && !list.isEmpty()) ? list.get(0) : null;
+    }
+
 }

@@ -194,7 +194,7 @@ public class RemoteClientController {
     }
 
     /**
-     * [新增] 根据课程获取选课学生列表 (用于批量录入)
+     * 根据课程获取选课学生列表 (用于批量录入)
      */
     @GetMapping("/course/students")
     @RequirePermission(roles = {"TEACHER"})
@@ -210,7 +210,7 @@ public class RemoteClientController {
     }
 
     /**
-     * [新增] 批量录入成绩
+     * 批量录入成绩
      */
     @PostMapping("/grade/batch-entry")
     @RequirePermission(roles = {"TEACHER"})
@@ -223,6 +223,54 @@ public class RemoteClientController {
         try {
             clientService.batchEntryGrade(grades, teacherId, clientIp);
             return Result.success("批量录入成功");
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 获取成绩统计数据
+     */
+    @GetMapping("/grade/stats")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<Map<String, Object>> getGradeStats(
+            @RequestParam String courseId,
+            @RequestParam String semester) {
+        try {
+            return Result.success(clientService.calculateGradeStats(courseId, semester));
+        } catch (Exception e) {
+            return Result.error("统计失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 保存成绩分析报告
+     */
+    @PostMapping("/grade/analysis/save")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<String> saveAnalysis(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
+        try {
+            clientService.saveAnalysis(params, teacherId, clientIp);
+            return Result.success("分析报告保存成功");
+        } catch (Exception e) {
+            return Result.error("保存失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取已保存的分析报告
+     */
+    @GetMapping("/grade/analysis/get")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<Map<String, Object>> getAnalysis(
+            @RequestParam String courseId,
+            @RequestParam String semester,
+            HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        try {
+            return Result.success(clientService.getAnalysis(courseId, semester, teacherId));
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }

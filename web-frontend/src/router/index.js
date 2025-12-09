@@ -48,7 +48,8 @@ const routes = [
         meta: { requiresAuth: true, roles: ['TEACHER'] },
         children: [
             { path: 'entry', component: () => import('@/views/teacher/ScoreEntry.vue') },
-            { path: 'grade-view', component: () => import('@/views/teacher/GradeView.vue') }
+            { path: 'grade-view', component: () => import('@/views/teacher/GradeView.vue') },
+            { path: 'analysis', component: () => import('@/views/teacher/GradeAnalysis.vue') }
         ]
     },
 
