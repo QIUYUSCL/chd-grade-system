@@ -1,204 +1,172 @@
 <template>
   <div class="grade-view">
-    <h2>成绩查看</h2>
+    <div class="header-actions">
+      <h2>成绩管理</h2>
+    </div>
 
-    <!-- 查询条件卡片 -->
-    <el-card class="query-card">
+    <el-card class="query-card" shadow="never">
       <el-form :inline="true" :model="queryForm" class="query-form">
-        <el-form-item label="学期" prop="semester">
-          <el-input v-model="queryForm.semester" placeholder="如: 2024-2025-1" clearable />
+        <el-form-item label="学期">
+          <el-input v-model="queryForm.semester" placeholder="如: 2024-2025-1" clearable :prefix-icon="Calendar" />
         </el-form-item>
 
-        <!-- 课程选择（动态加载） -->
-        <el-form-item label="课程" prop="courseId">
+        <el-form-item label="课程">
           <el-select
               v-model="queryForm.courseId"
               placeholder="请选择课程"
               clearable
               :loading="courseLoading"
-              :disabled="courseLoading || courses.length === 0">
+              :disabled="courseLoading || courses.length === 0"
+              style="width: 240px">
             <el-option
                 v-for="course in courses"
                 :key="course.course_id"
-                :label="course.course_name + ' (' + course.course_id + ')'"
-                :value="course.course_id" />
+                :label="course.course_name"
+                :value="course.course_id">
+              <span style="float: left">{{ course.course_name }}</span>
+              <span style="float: right; color: #ccc; font-size: 12px">{{ course.course_id }}</span>
+            </el-option>
           </el-select>
-          <span v-if="courses.length === 0 && !courseLoading" style="color: #909399; font-size: 12px;">
-            暂无任课课程
-          </span>
         </el-form-item>
 
         <el-form-item>
-          <el-button type="primary" @click="handleQuery" :loading="loading">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
+          <el-button type="primary" @click="handleQuery" :loading="loading" icon="Search">查询</el-button>
+          <el-button @click="resetQuery" icon="Refresh">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <!-- 成绩列表卡片 -->
-    <el-card class="list-card">
-      <el-table :data="gradeList" stripe style="width: 100%" v-loading="loading" border>
-        <el-table-column prop="student_id" label="学号" width="120" fixed />
-        <el-table-column prop="student_name" label="姓名" width="100" />
-        <el-table-column prop="course_name" label="课程名称" width="150" />
-        <el-table-column prop="total_score" label="总成绩" width="110">
+    <el-card class="list-card" shadow="hover">
+      <el-table :data="gradeList" stripe style="width: 100%" v-loading="loading" :header-cell-style="{background:'#f5f7fa'}">
+        <el-table-column prop="student_id" label="学号" width="130" fixed />
+        <el-table-column prop="student_name" label="姓名" width="120" />
+        <el-table-column prop="course_name" label="课程名称" min-width="150" />
+
+        <el-table-column prop="total_score" label="总成绩" width="120" align="center">
           <template #default="scope">
-            <el-tag :type="getScoreTagType(scope.row.total_score)" size="small">
+            <span :class="getScoreClass(scope.row.total_score)">
               {{ scope.row.total_score || '--' }}
-            </el-tag>
+            </span>
           </template>
         </el-table-column>
-        <el-table-column prop="exam_type" label="考试类型" width="100">
+
+        <el-table-column prop="exam_type" label="类型" width="100" align="center">
           <template #default="scope">
-            <el-tag :type="scope.row.exam_type === '正考' ? 'success' : 'warning'" size="small">
+            <el-tag :type="scope.row.exam_type === '正考' ? '' : 'warning'" effect="plain" size="small">
               {{ scope.row.exam_type }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="scope">
-            <el-tag :type="scope.row.status === 'SUBMITTED' ? 'success' : 'info'" size="small">
-              {{ scope.row.status === 'DRAFT' ? '暂存' : '已提交' }}
+            <el-tag :type="scope.row.status === 'SUBMITTED' ? 'success' : 'info'" effect="dark" size="small">
+              {{ scope.row.status === 'DRAFT' ? '草稿' : '已归档' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="semester" label="学期" width="120" />
-        <el-table-column prop="created_at" label="录入时间" width="180" />
 
-        <!-- 操作列 -->
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column prop="semester" label="学期" width="140" />
+
+        <el-table-column label="操作" width="100" fixed="right" align="center">
           <template #default="scope">
             <el-button
                 v-if="scope.row.status === 'DRAFT'"
                 type="primary"
+                link
                 size="small"
                 @click="handleEdit(scope.row)"
-                plain>
+                icon="Edit">
               修改
             </el-button>
-            <el-button
-                v-else
-                type="info"
-                size="small"
-                disabled
-                plain>
-              已锁定
-            </el-button>
+            <span v-else style="color: #c0c4cc; font-size: 12px">
+              <el-icon><Lock /></el-icon> 锁定
+            </span>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
-      <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="total"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-          class="pagination"
-      />
+      <div class="pagination-wrapper">
+        <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-sizes="[10, 20, 50]"
+            layout="total, prev, pager, next, sizes"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            background
+        />
+      </div>
     </el-card>
 
-    <!-- 编辑对话框 -->
     <el-dialog
         v-model="editDialogVisible"
-        title="修改成绩"
-        width="600px"
-        @close="resetEditForm">
-      <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="140px">
+        title="修改成绩记录"
+        width="500px"
+        @close="resetEditForm"
+        class="custom-dialog">
 
-        <el-form-item label="学号">
-          <el-input v-model="editForm.student_id" disabled />
-        </el-form-item>
+      <el-descriptions :column="2" border size="small" class="mb-20">
+        <el-descriptions-item label="姓名">{{ editForm.student_name }}</el-descriptions-item>
+        <el-descriptions-item label="学号">{{ editForm.student_id }}</el-descriptions-item>
+        <el-descriptions-item label="课程">{{ editForm.course_name }}</el-descriptions-item>
+        <el-descriptions-item label="类型">{{ editForm.exam_type }}</el-descriptions-item>
+      </el-descriptions>
 
-        <el-form-item label="学生姓名">
-          <el-input v-model="editForm.student_name" disabled />
-        </el-form-item>
-
-        <el-form-item label="课程">
-          <el-input :value="editForm.course_name + ' (' + editForm.course_id + ')'" disabled />
-        </el-form-item>
-
-        <el-form-item label="考试类型">
-          <el-tag :type="editForm.exam_type === '正考' ? 'success' : 'warning'" size="small">
-            {{ editForm.exam_type }}
-          </el-tag>
-        </el-form-item>
-
-        <!-- 成绩分项修改 -->
-        <el-divider content-position="left">修改成绩</el-divider>
-
+      <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="100px" class="edit-form">
         <el-form-item label="平时成绩" prop="dailyScore">
-          <el-input-number v-model="editForm.dailyScore" :min="0" :max="100" :precision="1" />
+          <el-input-number v-model="editForm.dailyScore" :min="0" :max="100" :precision="1" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="期末成绩" prop="finalScore">
-          <el-input-number v-model="editForm.finalScore" :min="0" :max="100" :precision="1" />
+          <el-input-number v-model="editForm.finalScore" :min="0" :max="100" :precision="1" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="补考成绩" prop="makeupScore" v-if="editForm.exam_type === '补考'">
-          <el-input-number v-model="editForm.makeupScore" :min="0" :max="100" :precision="1" />
+          <el-input-number v-model="editForm.makeupScore" :min="0" :max="100" :precision="1" style="width: 100%" />
         </el-form-item>
 
-        <el-form-item label="总成绩" prop="totalScore">
-          <el-input-number v-model="editForm.totalScore" :min="0" :max="100" :precision="1" disabled />
-          <span style="color: #909399; margin-left: 10px;">保存时自动重新计算加密</span>
+        <el-form-item label="预估总分">
+          <span style="font-weight: bold; color: #1890ff; font-size: 18px">{{ editForm.totalScore }}</span>
         </el-form-item>
-
       </el-form>
 
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitEdit" :loading="editLoading">
-          保存修改
-        </el-button>
-
-        <!-- 新增：提交成绩 -->
-        <el-button
-            type="success"
-            @click="submitAndCommit"
-            :loading="editLoading"
-            :disabled="!isFormValid">
-          提交成绩
-        </el-button>
-
+        <div class="dialog-footer">
+          <el-button @click="editDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitEdit" :loading="editLoading">保存修改</el-button>
+          <el-button type="success" @click="submitAndCommit" :loading="editLoading" :disabled="!isFormValid">提交并锁定</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import {ref, reactive, onMounted, nextTick, watch, computed} from 'vue'  // ✅ 导入 nextTick
-import { ElMessage  } from 'element-plus'
+// ... (script 逻辑保持不变，确保引入了 Calendar, Search, Refresh, Edit, Lock 图标) ...
+import { ref, reactive, onMounted, watch, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
-import { ElMessageBox } from 'element-plus'
+import { Calendar, Search, Refresh, Edit, Lock } from '@element-plus/icons-vue'
 
-// 查询表单
+// (此处粘贴原来的 JS 逻辑，包括 loadTeacherCourses, handleQuery, handleEdit 等)
 const queryForm = reactive({
   semester: '',
   courseId: ''
 })
 
-// 课程列表
 const courses = ref([])
 const courseLoading = ref(false)
-
-// 表格数据
 const gradeList = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-
-// 编辑对话框状态
 const editDialogVisible = ref(false)
 const editLoading = ref(false)
-const editFormRef = ref(null)  // ✅ 使用 null 初始化
+const editFormRef = ref(null)
 
-
-// 编辑表单数据
 const editForm = reactive({
   record_id: '',
   student_id: '',
@@ -212,7 +180,6 @@ const editForm = reactive({
   totalScore: null
 })
 
-// 在editForm定义后添加
 const isFormValid = computed(() => {
   return editForm.dailyScore != null &&
       editForm.finalScore != null &&
@@ -227,16 +194,12 @@ const editRules = {
   finalScore: [{ required: true, message: '请输入期末成绩', trigger: 'blur' }]
 }
 
-
-// 添加计算总成绩的监听
 watch([() => editForm.dailyScore, () => editForm.finalScore], ([daily, final]) => {
   if (daily != null && final != null && !isNaN(daily) && !isNaN(final)) {
-    // 根据业务规则计算总成绩（示例：平时*0.4 + 期末*0.6）
     editForm.totalScore = Math.round((daily * 0.4 + final * 0.6) * 10) / 10
   }
 }, { immediate: true })
 
-// 加载教师课程列表
 const loadTeacherCourses = async () => {
   courseLoading.value = true
   try {
@@ -259,7 +222,6 @@ const loadTeacherCourses = async () => {
   }
 }
 
-// 查询方法
 const handleQuery = async () => {
   loading.value = true
   try {
@@ -286,7 +248,6 @@ const handleQuery = async () => {
   }
 }
 
-// 重置查询
 const resetQuery = () => {
   queryForm.semester = ''
   queryForm.courseId = ''
@@ -294,7 +255,6 @@ const resetQuery = () => {
   handleQuery()
 }
 
-// 分页变化
 const handleSizeChange = (val) => {
   pageSize.value = val
   handleQuery()
@@ -305,18 +265,16 @@ const handleCurrentChange = (val) => {
   handleQuery()
 }
 
-// 成绩标签样式
-const getScoreTagType = (score) => {
-  if (!score) return 'info'
+// 辅助方法：成绩样式类
+const getScoreClass = (score) => {
+  if (!score) return ''
   const num = parseFloat(score)
-  if (num >= 90) return 'success'
-  if (num >= 60) return 'warning'
-  return 'danger'
+  if (num < 60) return 'score-danger'
+  if (num >= 90) return 'score-success'
+  return 'score-normal'
 }
 
-// 重置编辑表单（修复版）
 const resetEditForm = () => {
-  // 直接在同步代码中重置
   if (editFormRef.value) {
     try {
       editFormRef.value.resetFields()
@@ -324,8 +282,6 @@ const resetEditForm = () => {
       console.warn('重置表单字段时出错:', e)
     }
   }
-
-  // 手动重置所有字段
   editForm.record_id = ''
   editForm.student_id = ''
   editForm.student_name = ''
@@ -338,15 +294,8 @@ const resetEditForm = () => {
   editForm.totalScore = null
 }
 
-
-// 打开编辑对话框
 const handleEdit = (row) => {
-  console.log('编辑行数据:', JSON.stringify(row, null, 2))
-
-  // 1. 先同步重置
   resetEditForm()
-
-  // 2. 再填充数据
   editForm.record_id = row.record_id
   editForm.student_id = row.student_id
   editForm.student_name = row.student_name
@@ -357,53 +306,40 @@ const handleEdit = (row) => {
   editForm.finalScore = parseFloat(row.final_score || 0)
   editForm.makeupScore = row.makeup_score ? parseFloat(row.makeup_score) : null
   editForm.totalScore = parseFloat(row.total_score || 0)
-
-  // 3. 最后显示对话框
   editDialogVisible.value = true
 }
 
-
-// 提交修改
 const submitEdit = async () => {
   try {
     await editFormRef.value.validate()
-
     if ([editForm.dailyScore, editForm.finalScore, editForm.totalScore].some(v => v == null || isNaN(v))) {
       ElMessage.error('所有成绩分数都必须填写且为有效数字')
       return
     }
-
     editLoading.value = true
-
-    // 发送明文成绩字段，让后端统一加密
     const updateData = {
       daily_score: editForm.dailyScore.toString(),
       final_score: editForm.finalScore.toString(),
       total_score: editForm.totalScore.toString(),
       status: 'DRAFT'
     }
-
-    // 如果是补考，添加补考成绩
     if (editForm.exam_type === '补考' && editForm.makeupScore != null) {
       updateData.makeup_score = editForm.makeupScore.toString()
     }
-
-    // 关键修复：recordId 转换为字符串
     const res = await request.post('/remote/client/grade/update', {
       recordId: String(editForm.record_id),
-      data: updateData  // ✅ 明文数据
+      data: updateData
     })
-
     if (res.code === 200) {
       ElMessage.success('成绩修改成功')
       editDialogVisible.value = false
-      handleQuery() // 刷新列表
+      handleQuery()
     } else {
       ElMessage.error(res.message || '修改失败')
     }
   } catch (error) {
     if (error.response?.status === 403) {
-      ElMessage.error('权限验证失败或数据格式错误，请检查后端日志')
+      ElMessage.error('权限验证失败或数据格式错误')
     } else {
       ElMessage.error(error.message || '修改异常')
     }
@@ -414,10 +350,7 @@ const submitEdit = async () => {
 
 const submitAndCommit = async () => {
   try {
-    // 1. 表单验证
     await editFormRef.value.validate()
-
-    // 2. 二次确认
     await ElMessageBox.confirm(
         '提交后成绩将被锁定，无法再次修改，确定要提交吗？',
         '提交确认',
@@ -427,46 +360,33 @@ const submitAndCommit = async () => {
           type: 'warning'
         }
     )
-
     if ([editForm.dailyScore, editForm.finalScore, editForm.totalScore].some(v => v == null || isNaN(v))) {
       ElMessage.error('所有成绩分数都必须填写且为有效数字')
       return
     }
-
     editLoading.value = true
-
-    // 3. 发送明文成绩字段，状态设置为SUBMITTED
     const updateData = {
       daily_score: editForm.dailyScore.toString(),
       final_score: editForm.finalScore.toString(),
       total_score: editForm.totalScore.toString(),
-      status: 'SUBMITTED'  // ✅ 关键：状态改为已提交
+      status: 'SUBMITTED'
     }
-
-    // 补考成绩处理
     if (editForm.exam_type === '补考' && editForm.makeupScore != null) {
       updateData.makeup_score = editForm.makeupScore.toString()
     }
-
     const res = await request.post('/remote/client/grade/update', {
       recordId: String(editForm.record_id),
       data: updateData
     })
-
     if (res.code === 200) {
       ElMessage.success('成绩提交成功！记录已锁定')
       editDialogVisible.value = false
-      handleQuery() // 刷新列表
+      handleQuery()
     } else {
       ElMessage.error(res.message || '提交失败')
     }
   } catch (error) {
-    // 处理取消确认
-    if (error === 'cancel') {
-      ElMessage.info('已取消提交')
-      return
-    }
-
+    if (error === 'cancel') return
     if (error.response?.status === 403) {
       ElMessage.error('权限验证失败或数据格式错误')
     } else {
@@ -477,17 +397,6 @@ const submitAndCommit = async () => {
   }
 }
 
-
-const encryptScore = async (score) => {
-  // 处理 null、undefined、NaN 等情况
-  if (score == null || isNaN(score)) {
-    ElMessage.warning('存在无效的成绩分数，请检查输入')
-    throw new Error(`成绩分数无效: ${score}`)
-  }
-  return score.toString()
-}
-
-// 页面加载
 onMounted(() => {
   loadTeacherCourses()
   handleQuery()
@@ -495,32 +404,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.grade-view {
-  padding: 20px;
-  min-height: 100%;
-}
+.grade-view { padding: 20px; }
+.header-actions { margin-bottom: 20px; }
+.header-actions h2 { margin: 0; color: #303133; font-size: 22px; }
 
-.query-card, .list-card {
-  margin-bottom: 20px;
-  background: #fff;
-}
+.query-card { margin-bottom: 20px; border: none; }
+.query-form { margin-bottom: -18px; }
 
-.query-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: flex-start;
-}
+.list-card { border: none; }
 
-.pagination {
-  margin-top: 20px;
-  justify-content: flex-end;
-}
+.score-danger { color: #f56c6c; font-weight: bold; }
+.score-success { color: #67c23a; font-weight: bold; }
+.score-normal { color: #606266; }
 
-h2 {
-  color: #303133;
-  margin-bottom: 20px;
-  font-size: 24px;
-}
+.pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 
+.mb-20 { margin-bottom: 20px; }
 </style>

@@ -1,9 +1,8 @@
 <template>
   <div class="common-layout">
-    <!-- 侧边栏 -->
     <div class="sidebar">
       <div class="sidebar-header">
-        <h3>{{ roleText }}管理</h3>
+        <img src="@/assets/logo.svg" class="sidebar-logo" v-if="false" /> <h3 class="app-title">CHD Score</h3>
       </div>
       <div class="sidebar-menu">
         <el-menu
@@ -11,10 +10,9 @@
             class="el-menu-vertical"
             router
             background-color="#001529"
-            text-color="#fff"
-            active-text-color="#1890ff"
+            text-color="rgba(255, 255, 255, 0.65)"
+            active-text-color="#fff"
         >
-          <!-- 动态菜单项 -->
           <template v-for="menu in menuItems" :key="menu.index">
             <el-menu-item :index="menu.index">
               <el-icon><component :is="menu.icon" /></el-icon>
@@ -23,34 +21,34 @@
           </template>
           <el-menu-item index="/profile">
             <el-icon><User /></el-icon>
-            <span>个人信息</span>
+            <span>个人中心</span>
           </el-menu-item>
         </el-menu>
       </div>
     </div>
 
-    <!-- 主内容区 -->
     <div class="main-content">
-      <!-- 顶部导航 -->
       <div class="header">
         <div class="header-left">
+          <span class="role-badge">{{ roleText }}端</span>
           <span class="system-name">长安大学成绩管理系统</span>
         </div>
         <div class="header-right">
-          <el-dropdown>
-            <span class="user-info">
-              <el-avatar size="small" :src="userAvatar">{{ userInitial }}</el-avatar>
-              <span>{{ userStore.userInfo.userId }}</span>
-            </span>
+          <el-dropdown trigger="click">
+            <div class="user-info-card">
+              <el-avatar class="user-avatar" :size="32" :src="userAvatar" style="background: #1890ff">
+                {{ userInitial }}
+              </el-avatar>
+              <span class="user-name">{{ userStore.userInfo.userId }}</span>
+              <el-icon><CaretBottom /></el-icon>
+            </div>
             <template #dropdown>
-              <el-dropdown-menu>
+              <el-dropdown-menu class="user-dropdown">
                 <el-dropdown-item @click="showChangePassword = true">
-                  <el-icon><Key /></el-icon>
-                  修改密码
+                  <el-icon><Key /></el-icon>修改密码
                 </el-dropdown-item>
-                <el-dropdown-item @click="handleLogout">
-                  <el-icon><SwitchButton /></el-icon>
-                  退出登录
+                <el-dropdown-item divided @click="handleLogout" style="color: #ff4d4f">
+                  <el-icon><SwitchButton /></el-icon>退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -58,13 +56,15 @@
         </div>
       </div>
 
-      <!-- 页面内容 -->
       <div class="content-wrapper">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </div>
     </div>
 
-    <!-- 修改密码对话框 -->
     <ChangePassword
         :visible="showChangePassword"
         @update:visible="showChangePassword = $event"
@@ -78,75 +78,54 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
-import { User, Key, SwitchButton, View, Edit, Setting } from '@element-plus/icons-vue'
+import { User, Key, SwitchButton, View, Edit, Setting, CaretBottom } from '@element-plus/icons-vue'
 import ChangePassword from '@/components/ChangePassword.vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-
-// 状态管理
 const showChangePassword = ref(false)
 
-// 计算属性
 const activeMenu = computed(() => route.path)
 const userInfo = computed(() => userStore.userInfo)
 const role = computed(() => userInfo.value.role || '')
 
-// 角色文本
 const roleText = computed(() => {
-  const roleMap = {
-    'STUDENT': '学生',
-    'TEACHER': '教师',
-    'ADMIN': '管理员'
-  }
+  const roleMap = { 'STUDENT': '学生', 'TEACHER': '教师', 'ADMIN': '管理' }
   return roleMap[role.value] || '未知'
 })
 
-// 获取用户头像
 const userAvatar = ref('')
-
-// 获取用户首字母
 const userInitial = computed(() => {
   const userId = userStore.userInfo.userId
   return userId ? userId.charAt(0).toUpperCase() : 'U'
 })
 
-// 根据角色动态生成菜单项
 const menuItems = computed(() => {
   const roleMenus = {
-    'STUDENT': [
-      { index: '/student/grades', label: '成绩查询', icon: View }
-    ],
+    'STUDENT': [{ index: '/student/grades', label: '我的成绩', icon: View }],
     'TEACHER': [
       { index: '/teacher/entry', label: '成绩录入', icon: Edit },
-      { index: '/teacher/grade-view', label: '成绩查询', icon: View }
+      { index: '/teacher/grade-view', label: '成绩管理', icon: View }
     ],
-    'ADMIN': [
-      { index: '/admin/management', label: '系统管理', icon: Setting }
-    ]
+    'ADMIN': [{ index: '/admin/management', label: '系统概览', icon: Setting }, { index: '/admin/users', label: '用户管理', icon: User }]
   }
   return roleMenus[role.value] || []
 })
 
-// 处理退出登录
 const handleLogout = () => {
   userStore.clearUser()
-  ElMessage.success('退出登录成功')
+  ElMessage.success('已安全退出')
   router.push('/login')
 }
 
-// 处理密码修改成功
 const handlePasswordChangeSuccess = () => {
   userStore.clearUser()
   router.push('/login')
 }
 
-// 检查登录状态
 onMounted(() => {
-  if (!userStore.isAuthenticated()) {
-    router.push('/login')
-  }
+  if (!userStore.isAuthenticated()) router.push('/login')
 })
 </script>
 
@@ -159,75 +138,120 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 侧边栏样式 */
+/* 侧边栏优化 */
 .sidebar {
-  width: 240px;
-  background-color: #001529;
-  color: white;
-  height: 100vh;
-  flex-shrink: 0;
-  overflow-y: auto;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  width: 220px;
+  background: #001529;
+  box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
 }
 
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #1890ff;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #002140;
 }
 
-.sidebar-header h3 {
-  margin: 0;
+.app-title {
   color: white;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.el-menu-vertical {
+  border-right: none;
+}
+
+/* 选中菜单项的高亮样式 */
+:deep(.el-menu-item.is-active) {
+  background-color: #1890ff !important;
+  color: #fff !important;
+}
+
+/* 头部优化 */
+.header {
+  height: 64px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  z-index: 9;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.role-badge {
+  background: #e6f7ff;
+  color: #1890ff;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid #91d5ff;
+}
+
+.system-name {
   font-size: 18px;
+  font-weight: 600;
+  color: #333;
 }
 
-.sidebar-menu {
-  padding-top: 10px;
+.user-info-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 20px;
+  transition: all 0.3s;
+}
+.user-info-card:hover {
+  background: #f5f5f5;
 }
 
-/* 主内容区样式 */
+.user-name {
+  font-weight: 500;
+  color: #555;
+}
+
+/* 内容区 */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.header {
-  height: 64px;
-  background-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 24px;
-  flex-shrink: 0;
-}
-
-.system-name {
-  font-size: 18px;
-  font-weight: bold;
-  color: #1890ff;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-}
-
-.user-info:hover {
-  background-color: #f5f5f5;
+  background-color: #f0f2f5;
 }
 
 .content-wrapper {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   overflow-y: auto;
-  background-color: #f0f2f5;
+}
+
+/* 路由切换动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
 }
 </style>
