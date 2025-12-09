@@ -394,4 +394,80 @@ public class RemoteClientService {
             throw new RuntimeException("撤销失败: " + e.getResponseBodyAsString());
         }
     }
+
+    /**
+     * 根据学号查询姓名
+     */
+    @SuppressWarnings("unchecked")
+    public String getStudentName(String studentId) {
+        OperationDTO dto = new OperationDTO();
+        dto.setOperation("SELECT");
+        dto.setTable("students");
+        dto.setConditions(Map.of("student_id", studentId));
+
+        Map<String, Object> res = (Map<String, Object>) restTemplate.postForObject(serverUrl + "/select", dto, Map.class);
+
+        return (res != null && !res.isEmpty()) ? (String) res.get("name") : "未找到该学生";
+    }
+
+    /**
+     * 根据课程和学期查询选课学生
+     * 逻辑：先查 student_courses 表得到所有 student_id，再循环查 students 表得到详情
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getStudentsByCourse(String courseId, String semester) {
+        // 1. 查询选课关系
+        OperationDTO scQuery = new OperationDTO();
+        scQuery.setOperation("SELECT");
+        scQuery.setTable("student_courses");
+        scQuery.setConditions(Map.of("course_id", courseId, "semester", semester));
+
+        List<Map<String, Object>> relationList = (List<Map<String, Object>>) restTemplate.postForObject(serverUrl + "/selectList", scQuery, List.class);
+
+        if (relationList == null || relationList.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Map<String, Object>> studentList = new ArrayList<>();
+
+        // 2. 循环获取学生详情 (为了复用现有接口，暂不使用复杂SQL)
+        for (Map<String, Object> rel : relationList) {
+            String stuId = (String) rel.get("student_id");
+
+            OperationDTO stuQuery = new OperationDTO();
+            stuQuery.setOperation("SELECT");
+            stuQuery.setTable("students");
+            stuQuery.setConditions(Map.of("student_id", stuId));
+
+            Map<String, Object> student = (Map<String, Object>) restTemplate.postForObject(serverUrl + "/select", stuQuery, Map.class);
+            if (student != null) {
+                // 仅保留必要字段
+                Map<String, Object> info = new HashMap<>();
+                info.put("student_id", student.get("student_id"));
+                info.put("name", student.get("name"));
+                info.put("class_name", student.get("class_name"));
+                studentList.add(info);
+            }
+        }
+
+        return studentList;
+    }
+
+    /**
+     * 批量录入
+     */
+    public void batchEntryGrade(List<Map<String, Object>> grades, String teacherId, String clientIp) {
+        if (grades == null || grades.isEmpty()) return;
+
+        for (Map<String, Object> grade : grades) {
+            try {
+                // 复用单条录入逻辑 (包含加密、审计、补考校验等所有逻辑)
+                entryGrade(grade, teacherId, clientIp);
+            } catch (Exception e) {
+                String sid = (String) grade.get("studentId");
+                throw new RuntimeException("学生[" + sid + "]录入失败: " + e.getMessage());
+            }
+        }
+    }
+
 }

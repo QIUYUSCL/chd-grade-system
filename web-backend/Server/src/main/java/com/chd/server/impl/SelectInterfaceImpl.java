@@ -48,8 +48,8 @@ public class SelectInterfaceImpl implements SelectInterface {
     }
 
     private void validateTableName(String table) {
-        // ✅ 扩展支持成绩相关表
-        if (!table.matches("^(students|teachers|admins|grade_records|courses)$")) {
+
+        if (!table.matches("^(students|teachers|admins|grade_records|courses|student_courses)$")) {
             throw new RuntimeException("非法表名: " + table);
         }
     }

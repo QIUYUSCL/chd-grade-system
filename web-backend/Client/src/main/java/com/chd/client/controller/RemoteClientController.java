@@ -179,4 +179,53 @@ public class RemoteClientController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 获取学生姓名 (用于单条录入回显)
+     */
+    @GetMapping("/student/name")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<String> getStudentName(@RequestParam String studentId) {
+        try {
+            return Result.success(clientService.getStudentName(studentId));
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * [新增] 根据课程获取选课学生列表 (用于批量录入)
+     */
+    @GetMapping("/course/students")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<List<Map<String, Object>>> getStudentsByCourse(
+            @RequestParam String courseId,
+            @RequestParam String semester) {
+        try {
+            // 调用 Service 层的新方法
+            return Result.success(clientService.getStudentsByCourse(courseId, semester));
+        } catch (Exception e) {
+            return Result.error("获取选课学生失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * [新增] 批量录入成绩
+     */
+    @PostMapping("/grade/batch-entry")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<String> batchEntryGrade(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
+
+        List<Map<String, Object>> grades = (List<Map<String, Object>>) params.get("grades");
+
+        try {
+            clientService.batchEntryGrade(grades, teacherId, clientIp);
+            return Result.success("批量录入成功");
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
 }
