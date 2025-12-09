@@ -76,16 +76,7 @@ public class RemoteClientService {
         String examType = (String) gradeData.get("examType");
         String status = (String) gradeData.get("status");
 
-        // 1. Client端加密
-        String encryptedDaily = aesUtil.encrypt((String) gradeData.get("dailyScore"));
-        String encryptedFinal = aesUtil.encrypt((String) gradeData.get("finalScore"));
-        String encryptedTotal = aesUtil.encrypt((String) gradeData.get("totalScore"));
-        String encryptedMakeup = null;
-        if (gradeData.get("makeupScore") != null) {
-            encryptedMakeup = aesUtil.encrypt((String) gradeData.get("makeupScore"));
-        }
-
-        // 2. 封装数据对象
+        // 1. Client端加密所有可能的成绩字段
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("student_id", studentId);
         insertData.put("course_id", courseId);
@@ -93,11 +84,20 @@ public class RemoteClientService {
         insertData.put("semester", semester);
         insertData.put("exam_type", examType);
         insertData.put("status", status != null ? status : "DRAFT");
-        insertData.put("daily_score_encrypted", encryptedDaily);
-        insertData.put("final_score_encrypted", encryptedFinal);
-        insertData.put("total_score_encrypted", encryptedTotal);
-        insertData.put("makeup_score_encrypted", encryptedMakeup);
 
+        // 辅助方法：如果不为空则加密并放入Map
+        encryptAndPut(insertData, "daily_score_encrypted", gradeData.get("dailyScore"));
+        encryptAndPut(insertData, "final_score_encrypted", gradeData.get("finalScore"));
+        encryptAndPut(insertData, "total_score_encrypted", gradeData.get("totalScore"));
+        encryptAndPut(insertData, "makeup_score_encrypted", gradeData.get("makeupScore"));
+
+        // 新增字段
+        encryptAndPut(insertData, "attendance_score_encrypted", gradeData.get("attendanceScore"));
+        encryptAndPut(insertData, "homework_score_encrypted", gradeData.get("homeworkScore"));
+        encryptAndPut(insertData, "experiment_score_encrypted", gradeData.get("experimentScore"));
+        encryptAndPut(insertData, "midterm_score_encrypted", gradeData.get("midtermScore"));
+
+        // 2. 封装数据对象
         OperationDTO insertDTO = new OperationDTO();
         insertDTO.setOperation("INSERT");
         insertDTO.setTable("grade_records");
@@ -170,24 +170,34 @@ public class RemoteClientService {
     }
 
     /**
-     * 更新成绩
+     * 更新成绩（支持所有新字段）
      */
-    public boolean updateGradeWithEncryption(String recordId, String daily, String finalS, String totalS, String makeup, String status, String teacherId, String clientIp) {
-        // 加密
-        Map<String, Object> data = new HashMap<>();
-        data.put("daily_score_encrypted", aesUtil.encrypt(daily));
-        data.put("final_score_encrypted", aesUtil.encrypt(finalS));
-        data.put("total_score_encrypted", aesUtil.encrypt(totalS));
-        if (makeup != null) data.put("makeup_score_encrypted", aesUtil.encrypt(makeup));
-        data.put("status", status);
-        data.put("updated_at", "NOW()");
+    public boolean updateGradeWithEncryption(String recordId, Map<String, Object> plainData, String teacherId, String clientIp) {
+        // 1. 准备更新数据
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("updated_at", "NOW()");
+        updateData.put("status", plainData.get("status")); // 状态不加密
 
+        // 2. 加密所有传入的分数
+        encryptAndPut(updateData, "daily_score_encrypted", plainData.get("daily_score"));
+        encryptAndPut(updateData, "final_score_encrypted", plainData.get("final_score"));
+        encryptAndPut(updateData, "total_score_encrypted", plainData.get("total_score"));
+        encryptAndPut(updateData, "makeup_score_encrypted", plainData.get("makeup_score"));
+
+        // 新增字段
+        encryptAndPut(updateData, "attendance_score_encrypted", plainData.get("attendance_score"));
+        encryptAndPut(updateData, "homework_score_encrypted", plainData.get("homework_score"));
+        encryptAndPut(updateData, "experiment_score_encrypted", plainData.get("experiment_score"));
+        encryptAndPut(updateData, "midterm_score_encrypted", plainData.get("midterm_score"));
+
+        // 3. 封装请求
         OperationDTO dto = new OperationDTO();
         dto.setTable("grade_records");
         dto.setOperation("UPDATE");
-        dto.setData(data);
+        dto.setData(updateData);
         dto.setConditions(Map.of("record_id", recordId));
 
+        // 4. 远程调用
         Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/update", dto, Boolean.class);
 
         if (Boolean.TRUE.equals(success)) {
@@ -195,6 +205,13 @@ public class RemoteClientService {
             return true;
         }
         return false;
+    }
+
+    // 辅助方法：加密非空值并放入Map
+    private void encryptAndPut(Map<String, Object> map, String key, Object value) {
+        if (value != null && !String.valueOf(value).isEmpty()) {
+            map.put(key, aesUtil.encrypt(String.valueOf(value)));
+        }
     }
 
     // 获取课程

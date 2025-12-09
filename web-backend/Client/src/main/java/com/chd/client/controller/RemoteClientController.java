@@ -103,7 +103,7 @@ public class RemoteClientController {
     }
 
     /**
-     * 教师录入成绩
+     * 教师录入成绩 (支持多项成绩)
      */
     @PostMapping("/grade/entry")
     @RequirePermission(roles = {"TEACHER"})
@@ -113,34 +113,30 @@ public class RemoteClientController {
 
         try {
             clientService.entryGrade(gradeData, teacherId, clientIp);
-            return Result.success("录入成功");
+            return Result.success("成绩录入成功");
         } catch (Exception e) {
             return Result.error("录入失败: " + e.getMessage());
         }
     }
 
     /**
-     * 教师修改成绩
+     * 教师修改成绩 (支持多项成绩)
      */
     @PostMapping("/grade/update")
     @RequirePermission(roles = {"TEACHER"})
     public Result<String> updateGrade(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         String teacherId = (String) request.getAttribute("userId");
         String clientIp = getClientIp(request);
+
+        // 获取记录ID
         String recordId = String.valueOf(params.get("recordId"));
-        Map<String, Object> data = (Map<String, Object>) params.get("data");
+
+        // 获取包含所有明文成绩的Map (daily_score, final_score, attendance_score ...)
+        Map<String, Object> plainData = (Map<String, Object>) params.get("data");
 
         try {
-            // 提取明文数据
-            String dailyScore = (String) data.get("daily_score");
-            String finalScore = (String) data.get("final_score");
-            String totalScore = (String) data.get("total_score");
-            String makeupScore = (String) data.get("makeup_score");
-            String status = (String) data.get("status");
-
-            boolean success = clientService.updateGradeWithEncryption(
-                    recordId, dailyScore, finalScore, totalScore, makeupScore, status, teacherId, clientIp);
-
+            // 直接传递 Map 给 Service 处理
+            boolean success = clientService.updateGradeWithEncryption(recordId, plainData, teacherId, clientIp);
             return success ? Result.success("修改成功") : Result.error("修改失败");
         } catch (Exception e) {
             return Result.error("修改失败: " + e.getMessage());
