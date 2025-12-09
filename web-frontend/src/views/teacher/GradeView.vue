@@ -69,17 +69,28 @@
         <el-table-column prop="semester" label="学期" width="140" />
         <el-table-column prop="updated_at" label="最后更新" width="180" show-overflow-tooltip />
 
-        <el-table-column label="操作" width="100" fixed="right" align="center">
+        <el-table-column label="操作" width="150" fixed="right" align="center">
           <template #default="scope">
-            <el-button
-                v-if="scope.row.status === 'DRAFT'"
-                type="primary"
-                link
-                size="small"
-                @click="handleEdit(scope.row)"
-                icon="Edit">
-              修改
-            </el-button>
+            <div v-if="scope.row.status === 'DRAFT'">
+              <el-button
+                  type="primary"
+                  link
+                  size="small"
+                  @click="handleEdit(scope.row)"
+                  icon="Edit">
+                修改
+              </el-button>
+
+              <el-popconfirm
+                  title="确定要撤销这条暂存成绩吗？"
+                  @confirm="handleRevoke(scope.row)"
+                  confirm-button-text="确认撤销"
+                  cancel-button-text="取消">
+                <template #reference>
+                  <el-button type="danger" link size="small" icon="Delete">撤销</el-button>
+                </template>
+              </el-popconfirm>
+            </div>
             <span v-else style="color: #c0c4cc; font-size: 12px">
               <el-icon><Lock /></el-icon> 锁定
             </span>
@@ -225,7 +236,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
-import { Calendar, Search, Refresh, Edit, Lock, Warning } from '@element-plus/icons-vue'
+import { Calendar, Search, Refresh, Edit, Lock, Delete } from '@element-plus/icons-vue'
 
 const queryForm = reactive({
   semester: '',
@@ -468,6 +479,27 @@ const doSubmit = async (status) => {
     if (e !== 'cancel') ElMessage.error(e.message || '系统异常')
   } finally {
     editLoading.value = false
+  }
+}
+
+// 处理撤销
+const handleRevoke = async (row) => {
+  try {
+    loading.value = true
+    const res = await request.post('/remote/client/grade/revoke', {
+      recordId: row.record_id
+    })
+
+    if (res.code === 200) {
+      ElMessage.success('撤销成功')
+      handleQuery() // 刷新列表
+    } else {
+      ElMessage.error(res.message || '撤销失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '操作异常')
+  } finally {
+    loading.value = false
   }
 }
 

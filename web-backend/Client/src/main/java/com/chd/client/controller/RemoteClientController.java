@@ -161,4 +161,22 @@ public class RemoteClientController {
         String ip = request.getHeader("X-Forwarded-For");
         return (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) ? request.getRemoteAddr() : ip;
     }
+
+    /**
+     * 教师撤销成绩
+     */
+    @PostMapping("/grade/revoke")
+    @RequirePermission(roles = {"TEACHER"})
+    public Result<String> revokeGrade(@RequestBody Map<String, String> params, HttpServletRequest request) {
+        String teacherId = (String) request.getAttribute("userId");
+        String clientIp = getClientIp(request);
+        String recordId = params.get("recordId");
+
+        try {
+            clientService.revokeGrade(recordId, teacherId, clientIp);
+            return Result.success("成绩撤销成功");
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }

@@ -28,7 +28,7 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
         Map<String, Object> data = dto.getData();
         Map<String, Object> conditions = dto.getConditions();
 
-        // 构建 UPDATE SQL（注意：生产环境应使用参数化查询防止SQL注入）
+        // 构建 UPDATE SQL
         StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
 
         // SET 子句
@@ -36,7 +36,7 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
             sql.append(key).append(" = ");
             // 检查是否是SQL函数
             if (value instanceof String && "NOW()".equals(value)) {
-                sql.append("NOW(), "); // 直接拼函数，不加引号
+                sql.append("NOW(), ");
             } else if (value instanceof String) {
                 sql.append("'").append(value).append("', ");
             } else {
@@ -60,9 +60,12 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
         try {
             int rows = jdbcTemplate.update(sql.toString());
             return rows > 0;
+        } catch (DuplicateKeyException e) {
+            // [新增] 修改时也捕获唯一性冲突
+            throw new RuntimeException("已有成绩记录");
         } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+            // [修改] 抛出具体错误信息而不是简单的返回 false
+            throw new RuntimeException("更新失败: " + e.getMessage());
         }
     }
 
@@ -74,7 +77,6 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
 
         StringBuilder sql = new StringBuilder("INSERT INTO ").append(table).append(" (");
         StringBuilder values = new StringBuilder(" VALUES (");
-        //log.info("执行INSERT SQL: {}", sql);
 
         data.forEach((key, value) -> {
             sql.append(key).append(", ");
@@ -92,15 +94,46 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
 
         try {
             int rows = jdbcTemplate.update(sql.toString());
-            //log.info("INSERT影响行数: {}", rows);
             return rows > 0;
         } catch (DuplicateKeyException e) {
-            //  捕获主键/唯一索引冲突异常，抛出中文提示
-            throw new RuntimeException("该学生此课程已有成绩记录，请勿重复录入！");
+            // [修改] 捕获唯一索引/主键冲突，返回更直观的提示
+            throw new RuntimeException("已有成绩记录");
         } catch (Exception e) {
             // 其他数据库异常
             throw new RuntimeException("数据库操作失败: " + e.getMessage());
         }
     }
 
+
+    // 实现删除逻辑
+    @Override
+    @Transactional
+    public boolean delete(OperationDTO dto) {
+        String table = dto.getTable();
+        Map<String, Object> conditions = dto.getConditions();
+
+        if (conditions == null || conditions.isEmpty()) {
+            throw new RuntimeException("删除操作必须指定条件");
+        }
+
+        StringBuilder sql = new StringBuilder("DELETE FROM ").append(table).append(" WHERE ");
+
+        conditions.forEach((key, value) -> {
+            sql.append(key).append(" = ");
+            if (value instanceof String) {
+                sql.append("'").append(value).append("' AND ");
+            } else {
+                sql.append(value).append(" AND ");
+            }
+        });
+
+        sql.setLength(sql.length() - 5); // 移除最后的 " AND "
+
+        try {
+            int rows = jdbcTemplate.update(sql.toString());
+            return rows > 0;
+        } catch (Exception e) {
+            throw new RuntimeException("删除失败: " + e.getMessage());
+        }
+    }
 }

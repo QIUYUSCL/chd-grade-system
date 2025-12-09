@@ -77,4 +77,10 @@ public class RpcProviderController {
         log.info("RPC Audit: {} on {}", dto.getOperationType(), dto.getTableName());
         return auditInterface.logOperation(dto);
     }
+
+    @PostMapping("/manipulate/delete")
+    public boolean delete(@RequestBody OperationDTO dto) {
+        log.info("RPC Delete: table={}", dto.getTable());
+        return manipulationInterface.delete(dto);
+    }
 }

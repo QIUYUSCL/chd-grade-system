@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpStatusCodeException; // [关键] 引入异常类
 
 @Service
 public class RemoteClientService {
@@ -62,7 +63,7 @@ public class RemoteClientService {
     }
 
     /**
-     * 录入成绩 (核心修改：增加补考资格校验)
+     * 录入成绩
      */
     @SuppressWarnings("unchecked")
     public void entryGrade(Map<String, Object> gradeData, String teacherId, String clientIp) {
@@ -71,8 +72,7 @@ public class RemoteClientService {
         String semester = (String) gradeData.get("semester");
         String examType = (String) gradeData.get("examType");
 
-        // ======================= [核心修复开始] =======================
-        // 如果是补考录入，必须校验：1. 是否有正考记录  2. 正考成绩是否 < 60
+        // 补考资格校验
         if ("补考".equals(examType)) {
             OperationDTO queryDTO = new OperationDTO();
             queryDTO.setOperation("SELECT");
@@ -81,22 +81,18 @@ public class RemoteClientService {
             conditions.put("student_id", studentId);
             conditions.put("course_id", courseId);
             conditions.put("semester", semester);
-            conditions.put("exam_type", "正考"); // 强制查正考
+            conditions.put("exam_type", "正考");
             queryDTO.setConditions(conditions);
 
-            // 远程查询列表
             List<Map<String, Object>> resultList = (List<Map<String, Object>>) restTemplate.postForObject(serverUrl + "/selectList", queryDTO, List.class);
 
-            // 校验1: 必须有正考记录
             if (resultList == null || resultList.isEmpty()) {
-                throw new RuntimeException("该学生本学期无正考记录，无法直接录入补考成绩！");
+                throw new RuntimeException("该学生本学期无正考记录，无法录入补考成绩！");
             }
 
-            // 校验2: 正考成绩必须不及格
             Map<String, Object> regularRecord = resultList.get(0);
             String encryptedTotal = (String) regularRecord.get("total_score_encrypted");
             if (encryptedTotal != null) {
-                // 解密正考总成绩
                 String totalScoreStr = aesUtil.decrypt(encryptedTotal);
                 try {
                     double totalScore = Double.parseDouble(totalScoreStr);
@@ -106,14 +102,9 @@ public class RemoteClientService {
                 } catch (NumberFormatException e) {
                     log.warn("成绩解析异常: " + totalScoreStr);
                 }
-            } else {
-                // 有记录但没分（可能是草稿），视为未完成正考
-                throw new RuntimeException("该学生正考成绩尚未提交或无效，无法录入补考成绩！");
             }
         }
-        // ======================= [核心修复结束] =======================
 
-        // 正常录入流程
         String status = (String) gradeData.get("status");
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("student_id", studentId);
@@ -137,12 +128,24 @@ public class RemoteClientService {
         insertDTO.setTable("grade_records");
         insertDTO.setData(insertData);
 
-        Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/insert", insertDTO, Boolean.class);
+        try {
+            // [关键修改] 捕获远程调用异常
+            Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/insert", insertDTO, Boolean.class);
 
-        if (Boolean.TRUE.equals(success)) {
-            sendAuditLog("GRADE_ENTRY", "grade_records", studentId + "_" + courseId, teacherId, "TEACHER", clientIp);
-        } else {
-            throw new RuntimeException("服务端插入失败");
+            if (Boolean.TRUE.equals(success)) {
+                sendAuditLog("GRADE_ENTRY", "grade_records", studentId + "_" + courseId, teacherId, "TEACHER", clientIp);
+            } else {
+                throw new RuntimeException("服务端插入失败");
+            }
+        } catch (HttpStatusCodeException e) {
+            // 获取服务端返回的错误信息体 (就是那个包含trace的JSON)
+            String responseBody = e.getResponseBodyAsString();
+            // 检查是否包含关键提示
+            if (responseBody.contains("已有成绩记录")) {
+                throw new RuntimeException("已有成绩记录");
+            }
+            // 如果是其他错误，为了美观也可以简化提示
+            throw new RuntimeException("录入失败: " + e.getStatusText());
         }
     }
 
@@ -224,13 +227,22 @@ public class RemoteClientService {
         dto.setData(updateData);
         dto.setConditions(Map.of("record_id", recordId));
 
-        Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/update", dto, Boolean.class);
+        try {
+            // [关键修改] 捕获远程调用异常
+            Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/update", dto, Boolean.class);
 
-        if (Boolean.TRUE.equals(success)) {
-            sendAuditLog("GRADE_UPDATE", "grade_records", recordId, teacherId, "TEACHER", clientIp);
-            return true;
+            if (Boolean.TRUE.equals(success)) {
+                sendAuditLog("GRADE_UPDATE", "grade_records", recordId, teacherId, "TEACHER", clientIp);
+                return true;
+            }
+            return false;
+        } catch (HttpStatusCodeException e) {
+            String body = e.getResponseBodyAsString();
+            if (body.contains("已有成绩记录")) {
+                throw new RuntimeException("已有成绩记录");
+            }
+            throw new RuntimeException("修改失败");
         }
-        return false;
     }
 
     @SuppressWarnings("unchecked")
@@ -256,7 +268,7 @@ public class RemoteClientService {
 
         Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/update", dto, Boolean.class);
 
-        if (Boolean.TRUE.equals(success)) {
+        if(Boolean.TRUE.equals(success)) {
             sendAuditLog("PASSWORD_RESET", table, targetUserId, adminId, "ADMIN", ip);
             return true;
         }
@@ -336,5 +348,50 @@ public class RemoteClientService {
     private void decryptAndPut(Map<String, Object> map, String targetKey, String sourceKey) {
         String encrypted = (String) map.get(sourceKey);
         map.put(targetKey, encrypted != null ? aesUtil.decrypt(encrypted) : "--");
+    }
+
+    /**
+     * 撤销（删除）成绩记录
+     * 逻辑：先查询记录状态，如果是 DRAFT 则删除，否则报错
+     */
+    @SuppressWarnings("unchecked")
+    public void revokeGrade(String recordId, String teacherId, String clientIp) {
+        // 1. 先查询该记录，确认是否存在以及状态
+        OperationDTO queryDTO = new OperationDTO();
+        queryDTO.setOperation("SELECT");
+        queryDTO.setTable("grade_records");
+        // 必须同时匹配 recordId 和 teacherId，防止删除别人的成绩
+        queryDTO.setConditions(Map.of("record_id", recordId, "teacher_id", teacherId));
+
+        List<Map<String, Object>> list = (List<Map<String, Object>>) restTemplate.postForObject(serverUrl + "/selectList", queryDTO, List.class);
+
+        if (list == null || list.isEmpty()) {
+            throw new RuntimeException("记录不存在或无权操作");
+        }
+
+        Map<String, Object> record = list.get(0);
+        String status = (String) record.get("status");
+
+        // 2. 核心校验：只有草稿才能撤销
+        if ("SUBMITTED".equals(status)) {
+            throw new RuntimeException("该成绩已归档锁定，无法撤销！如需修改请联系管理员。");
+        }
+
+        // 3. 执行物理删除
+        OperationDTO deleteDTO = new OperationDTO();
+        deleteDTO.setOperation("DELETE");
+        deleteDTO.setTable("grade_records");
+        deleteDTO.setConditions(Map.of("record_id", recordId));
+
+        try {
+            Boolean success = restTemplate.postForObject(serverUrl + "/manipulate/delete", deleteDTO, Boolean.class);
+            if (Boolean.TRUE.equals(success)) {
+                sendAuditLog("GRADE_REVOKE", "grade_records", recordId, teacherId, "TEACHER", clientIp);
+            } else {
+                throw new RuntimeException("服务端删除失败");
+            }
+        } catch (HttpStatusCodeException e) {
+            throw new RuntimeException("撤销失败: " + e.getResponseBodyAsString());
+        }
     }
 }
