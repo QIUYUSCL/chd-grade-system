@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 
 @Service
 public class ManipulationInterfaceImpl implements ManipulationInterface {
@@ -73,7 +74,7 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
 
         StringBuilder sql = new StringBuilder("INSERT INTO ").append(table).append(" (");
         StringBuilder values = new StringBuilder(" VALUES (");
-        log.info("执行INSERT SQL: {}", sql);
+        //log.info("执行INSERT SQL: {}", sql);
 
         data.forEach((key, value) -> {
             sql.append(key).append(", ");
@@ -91,10 +92,13 @@ public class ManipulationInterfaceImpl implements ManipulationInterface {
 
         try {
             int rows = jdbcTemplate.update(sql.toString());
-            log.info("INSERT影响行数: {}", rows);
+            //log.info("INSERT影响行数: {}", rows);
             return rows > 0;
+        } catch (DuplicateKeyException e) {
+            //  捕获主键/唯一索引冲突异常，抛出中文提示
+            throw new RuntimeException("该学生此课程已有成绩记录，请勿重复录入！");
         } catch (Exception e) {
-            log.error("INSERT执行失败 - SQL: {}, 异常: {}", sql, e.getMessage(), e);
+            // 其他数据库异常
             throw new RuntimeException("数据库操作失败: " + e.getMessage());
         }
     }
