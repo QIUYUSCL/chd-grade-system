@@ -29,7 +29,7 @@
               <el-form-item label="学生学号" prop="studentId">
                 <el-input
                     v-model="form.studentId"
-                    placeholder="输入学号后失焦自动匹配"
+                    placeholder="输入学号"
                     @blur="fetchStudentName"
                     clearable
                 >

@@ -7,20 +7,23 @@
             <div class="header-bg"></div>
             <div class="avatar-wrapper">
               <el-avatar :size="80" class="user-avatar">
-                {{ userInfo.userId ? userInfo.userId.charAt(0).toUpperCase() : 'U' }}
+                {{ userInfo.name ? userInfo.name.charAt(0) : (userInfo.userId ? userInfo.userId.charAt(0) : 'U') }}
               </el-avatar>
             </div>
           </div>
 
           <div class="profile-body">
-            <h2 class="username">你好，{{ userInfo.userId }}</h2>
+            <h2 class="username">你好，{{ userInfo.name || userInfo.userId }}</h2>
             <p class="role-tag">{{ roleText }}</p>
 
             <el-divider />
 
             <el-descriptions :column="1" border class="info-list">
+              <el-descriptions-item label="姓名">
+                <el-icon><User /></el-icon> {{ userInfo.name || '未设置' }}
+              </el-descriptions-item>
               <el-descriptions-item label="账号ID">
-                <el-icon><User /></el-icon> {{ userInfo.userId }}
+                <el-icon><IceCream /></el-icon> {{ userInfo.userId }}
               </el-descriptions-item>
               <el-descriptions-item label="所属角色">
                 <el-tag size="small" :type="roleTagType">{{ roleText }}</el-tag>
@@ -51,7 +54,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useUserStore } from '@/store/user'
-import { User, Edit } from '@element-plus/icons-vue' // 需确保引入图标
+import {User, Edit, Umbrella, Grid, IceCream} from '@element-plus/icons-vue' // 需确保引入图标
 import ChangePassword from '@/components/ChangePassword.vue'
 
 const userStore = useUserStore()

@@ -95,7 +95,6 @@ const handleLogin = async () => {
 
     const { data: token } = await loginApi(loginDTO)
     userStore.setToken(token)
-    userStore.setUserInfo({ userId: form.username, role: form.role })
 
     const routes = {
       STUDENT: '/student/grades',

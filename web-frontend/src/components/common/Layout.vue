@@ -43,7 +43,7 @@
               <el-avatar class="user-avatar" :size="32" :src="userAvatar" style="background: #1890ff">
                 {{ userInitial }}
               </el-avatar>
-              <span class="user-name">{{ userStore.userInfo.userId }}</span>
+              <span class="user-name">{{ userStore.userInfo.name || userStore.userInfo.userId }}</span>
               <el-icon><CaretBottom /></el-icon>
             </div>
             <template #dropdown>
@@ -101,8 +101,8 @@ const roleText = computed(() => {
 
 const userAvatar = ref('')
 const userInitial = computed(() => {
-  const userId = userStore.userInfo.userId
-  return userId ? userId.charAt(0).toUpperCase() : 'U'
+  const name = userStore.userInfo.name || userStore.userInfo.userId
+  return name ? name.charAt(0).toUpperCase() : 'U'
 })
 
 const menuItems = computed(() => {
