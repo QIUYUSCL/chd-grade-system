@@ -235,9 +235,10 @@ public class RemoteClientController {
     @RequirePermission(roles = {"TEACHER"})
     public Result<Map<String, Object>> getGradeStats(
             @RequestParam String courseId,
-            @RequestParam String semester) {
+            @RequestParam String semester,
+            @RequestParam(defaultValue = "正考") String examType) {
         try {
-            return Result.success(clientService.calculateGradeStats(courseId, semester));
+            return Result.success(clientService.calculateGradeStats(courseId, semester, examType));
         } catch (Exception e) {
             return Result.error("统计失败: " + e.getMessage());
         }

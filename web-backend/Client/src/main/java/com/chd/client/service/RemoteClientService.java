@@ -474,8 +474,8 @@ public class RemoteClientService {
      * 计算成绩统计指标
      */
     @SuppressWarnings("unchecked")
-    public Map<String, Object> calculateGradeStats(String courseId, String semester) {
-        // 1. 获取应考人数 (选课人数)
+    public Map<String, Object> calculateGradeStats(String courseId, String semester, String examType) {
+        // 1. 获取应考人数
         List<Map<String, Object>> students = getStudentsByCourse(courseId, semester);
         int totalStudents = students.size();
 
@@ -483,29 +483,42 @@ public class RemoteClientService {
         OperationDTO queryDTO = new OperationDTO();
         queryDTO.setOperation("SELECT");
         queryDTO.setTable("grade_records");
-        queryDTO.setConditions(Map.of("course_id", courseId, "semester", semester));
+        Map<String, Object> conditions = new HashMap<>();
+        conditions.put("course_id", courseId);
+        conditions.put("semester", semester);
+        conditions.put("status", "SUBMITTED"); // 只统计已归档
+        if (examType != null && !examType.isEmpty()) {
+            conditions.put("exam_type", examType);
+        }
+        queryDTO.setConditions(conditions);
 
         List<Map<String, Object>> records = (List<Map<String, Object>>) restTemplate.postForObject(serverUrl + "/selectList", queryDTO, List.class);
         if (records == null) records = new ArrayList<>();
 
+        if ("补考".equals(examType)) {
+            totalStudents = records.size();
+        }
+
         // 3. 统计指标计算
-        int realStudents = 0; // 实考人数 (有有效分数)
+        int realStudents = 0;
         double sumScore = 0;
         double maxScore = 0;
-        double minScore = 100; // 初始设为满分，方便找最小值
+        double minScore = 100;
         int passCount = 0;
-
-        // 分段统计: [0:<60, 1:60-69, 2:70-79, 3:80-89, 4:>=90]
         int[] distribution = new int[5];
+
+        // [新增] 用于存储所有具体分数，供折线图使用
+        List<Double> scoreList = new ArrayList<>();
 
         for (Map<String, Object> record : records) {
             String encTotal = (String) record.get("total_score_encrypted");
-            // 忽略未录入或无效数据
             if (encTotal == null) continue;
 
             try {
-                // 解密并转为数字
                 double score = Double.parseDouble(aesUtil.decrypt(encTotal));
+
+                // [新增] 收集分数
+                scoreList.add(score);
 
                 realStudents++;
                 sumScore += score;
@@ -514,7 +527,6 @@ public class RemoteClientService {
                 if (score < minScore) minScore = score;
                 if (score >= 60) passCount++;
 
-                // 统计分布
                 if (score < 60) distribution[0]++;
                 else if (score < 70) distribution[1]++;
                 else if (score < 80) distribution[2]++;
@@ -526,19 +538,22 @@ public class RemoteClientService {
             }
         }
 
-        // 修正无数据时的最小值
         if (realStudents == 0) minScore = 0;
+
+        // [新增] 对分数进行排序（从小到大），以便画出S型趋势线
+        Collections.sort(scoreList);
 
         // 4. 封装结果
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalStudents", totalStudents); // 应考
-        stats.put("realStudents", realStudents);   // 实考
-        stats.put("missingStudents", totalStudents - realStudents); // 缺考/未录
+        stats.put("totalStudents", totalStudents);
+        stats.put("realStudents", realStudents);
         stats.put("maxScore", maxScore);
         stats.put("minScore", minScore);
         stats.put("avgScore", realStudents > 0 ? String.format("%.2f", sumScore / realStudents) : "0.00");
         stats.put("passRate", realStudents > 0 ? String.format("%.2f", (double)passCount * 100 / realStudents) : "0.00");
-        stats.put("distribution", distribution); // 数组
+        stats.put("distribution", distribution);
+        // [新增] 返回分数列表
+        stats.put("scoreList", scoreList);
 
         return stats;
     }

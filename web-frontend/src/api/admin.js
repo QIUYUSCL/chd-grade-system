@@ -29,14 +29,3 @@ export const getUserList = (role, page = 1, pageSize = 20, userId = '') => {
         params: { page, pageSize }
     });
 };
-
-/**
- * 管理员重置用户密码
- */
-export const adminResetPassword = (targetUserId, targetRole, newPassword) => {
-    return request.post('/remote/client/password/admin/reset', {
-        targetUserId,
-        targetRole,
-        newPassword
-    });
-};

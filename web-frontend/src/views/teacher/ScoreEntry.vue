@@ -205,11 +205,11 @@ const form = reactive({
   studentName: '',
   examType: '正考',
 
-  attendanceRatio: 10, attendanceScore: null,
+  dailyRatio: 10,       dailyScore: null,
+  attendanceRatio: 0, attendanceScore: null,
   homeworkRatio: 20,   homeworkScore: null,
   experimentRatio: 0,  experimentScore: null,
   midtermRatio: 0,     midtermScore: null,
-  dailyRatio: 0,       dailyScore: null,
   finalRatio: 70,      finalScore: null,
 
   makeupScore: null,
@@ -218,11 +218,11 @@ const form = reactive({
 
 // 配置项
 const scoreConfigItems = [
+  { key: 'daily',  label: '平时成绩', ratioKey: 'dailyRatio',      scoreKey: 'dailyScore' },
   { key: 'attend', label: '考勤', ratioKey: 'attendanceRatio', scoreKey: 'attendanceScore' },
   { key: 'hw',     label: '作业', ratioKey: 'homeworkRatio',   scoreKey: 'homeworkScore' },
   { key: 'exp',    label: '实验', ratioKey: 'experimentRatio', scoreKey: 'experimentScore' },
   { key: 'mid',    label: '期中', ratioKey: 'midtermRatio',    scoreKey: 'midtermScore' },
-  { key: 'daily',  label: '平时', ratioKey: 'dailyRatio',      scoreKey: 'dailyScore' },
   { key: 'final',  label: '期末', ratioKey: 'finalRatio',      scoreKey: 'finalScore' },
 ]
 

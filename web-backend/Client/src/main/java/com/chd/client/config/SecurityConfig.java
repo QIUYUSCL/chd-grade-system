@@ -33,6 +33,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+
+        // 添加域名和云服务器IP
+        config.addAllowedOrigin("https://www.testscl.xyz");
+        config.addAllowedOrigin("http://www.testscl.xyz");
+        config.addAllowedOrigin("http://8.218.190.69");
+
+        config.addAllowedOrigin("http://10.81.138.82:5174");
         config.addAllowedOrigin("http://localhost:5174");
         config.addAllowedMethod( "*" );
         config.addAllowedHeader("*");
