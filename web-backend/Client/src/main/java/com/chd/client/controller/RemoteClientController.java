@@ -87,6 +87,8 @@ public class RemoteClientController {
     public Result<Map<String, Object>> viewGrades(
             @RequestParam(required = false) String semester,
             @RequestParam(required = false) String courseId,
+            @RequestParam(required = false) String examType,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
             HttpServletRequest request) {
@@ -95,7 +97,7 @@ public class RemoteClientController {
         String clientIp = getClientIp(request);
 
         try {
-            Map<String, Object> result = clientService.viewGrades(teacherId, semester, courseId, page, pageSize, clientIp);
+            Map<String, Object> result = clientService.viewGrades(teacherId, semester, courseId, examType, status, page, pageSize, clientIp);
             return Result.success(result);
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());

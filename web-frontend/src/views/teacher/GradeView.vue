@@ -7,7 +7,7 @@
     <el-card class="query-card no-print" shadow="never">
       <el-form :inline="true" :model="queryForm" class="query-form">
         <el-form-item label="学期">
-          <el-input v-model="queryForm.semester" placeholder="如: 2024-2025-1" clearable :prefix-icon="Calendar" />
+          <el-input v-model="queryForm.semester" placeholder="如: 2024-2025-1" clearable :prefix-icon="Calendar" style="width: 160px" />
         </el-form-item>
 
         <el-form-item label="课程">
@@ -15,17 +15,31 @@
               v-model="queryForm.courseId"
               placeholder="请选择课程"
               clearable
+              filterable
               :loading="courseLoading"
               :disabled="courseLoading || courses.length === 0"
-              style="width: 240px">
+              style="width: 200px">
             <el-option
                 v-for="course in courses"
                 :key="course.course_id"
                 :label="course.course_name"
                 :value="course.course_id">
               <span style="float: left">{{ course.course_name }}</span>
-              <span style="float: right; color: #ccc; font-size: 12px">{{ course.course_id }}</span>
             </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="类型">
+          <el-select v-model="queryForm.examType" placeholder="全部" clearable style="width: 100px">
+            <el-option label="正考" value="正考" />
+            <el-option label="补考" value="补考" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="状态">
+          <el-select v-model="queryForm.status" placeholder="全部" clearable style="width: 100px">
+            <el-option label="草稿" value="DRAFT" />
+            <el-option label="已归档" value="SUBMITTED" />
           </el-select>
         </el-form-item>
 
@@ -47,20 +61,60 @@
     </div>
 
     <el-card class="list-card" shadow="hover">
-      <el-table :data="gradeList" stripe style="width: 100%" v-loading="loading" :header-cell-style="{background:'#f5f7fa'}">
-        <el-table-column prop="student_id" label="学号" width="130" />
-        <el-table-column prop="student_name" label="姓名" width="120" />
-        <el-table-column prop="course_name" label="课程名称" min-width="150" />
+      <el-table
+          :data="gradeList"
+          stripe
+          style="width: 100%"
+          v-loading="loading"
+          :header-cell-style="{background:'#f5f7fa', color: '#000', fontWeight: 'bold'}"
+          class="print-table"
+      >
+        <el-table-column prop="student_id" label="学号" width="110" />
+        <el-table-column prop="student_name" label="姓名" width="90" />
+        <el-table-column prop="course_name" label="课程名称" min-width="140" show-overflow-tooltip />
 
-        <el-table-column prop="total_score" label="总成绩" width="120" align="center">
+        <el-table-column prop="credit" label="学分" width="60" align="center">
           <template #default="scope">
-            <span :class="getScoreClass(scope.row.total_score)">
+            {{ scope.row.credit || '3.0' }}
+          </template>
+        </el-table-column>
+
+        <el-table-column label="平时" width="60" align="center">
+          <template #default="scope"><span class="sub-score">{{ formatScore(scope.row.daily_score) }}</span></template>
+        </el-table-column>
+        <el-table-column label="考勤" width="60" align="center">
+          <template #default="scope"><span class="sub-score">{{ formatScore(scope.row.attendance_score) }}</span></template>
+        </el-table-column>
+        <el-table-column label="作业" width="60" align="center">
+          <template #default="scope"><span class="sub-score">{{ formatScore(scope.row.homework_score) }}</span></template>
+        </el-table-column>
+        <el-table-column label="实验" width="60" align="center">
+          <template #default="scope"><span class="sub-score">{{ formatScore(scope.row.experiment_score) }}</span></template>
+        </el-table-column>
+        <el-table-column label="期中" width="60" align="center">
+          <template #default="scope"><span class="sub-score">{{ formatScore(scope.row.midterm_score) }}</span></template>
+        </el-table-column>
+        <el-table-column label="期末" width="60" align="center">
+          <template #default="scope"><span class="sub-score" style="font-weight: bold">{{ formatScore(scope.row.final_score) }}</span></template>
+        </el-table-column>
+
+        <el-table-column prop="total_score" label="总成绩" width="80" align="center">
+          <template #default="scope">
+            <span :class="getScoreClass(scope.row.total_score)" class="main-score">
               {{ scope.row.total_score || '--' }}
             </span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="exam_type" label="类型" width="100" align="center">
+        <el-table-column label="绩点" width="60" align="center">
+          <template #default="scope">
+            <span :class="getGPAClass(calculateGPA(scope.row.total_score))" class="gpa-text">
+              {{ calculateGPA(scope.row.total_score) }}
+            </span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="exam_type" label="类型" width="70" align="center">
           <template #default="scope">
             <div class="no-print">
               <el-tag :type="scope.row.exam_type === '正考' ? '' : 'warning'" effect="plain" size="small">
@@ -71,25 +125,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="status" label="状态" width="70" align="center">
           <template #default="scope">
             <div class="no-print">
               <el-tag :type="scope.row.status === 'SUBMITTED' ? 'success' : 'info'" effect="dark" size="small">
-                {{ scope.row.status === 'DRAFT' ? '草稿' : '已归档' }}
+                {{ scope.row.status === 'DRAFT' ? '草稿' : '归档' }}
               </el-tag>
             </div>
-            <span class="show-in-print">{{ scope.row.status === 'DRAFT' ? '草稿' : '已归档' }}</span>
+            <span class="show-in-print">{{ scope.row.status === 'DRAFT' ? '草稿' : '归档' }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="semester" label="学期" width="140" />
-        <el-table-column prop="updated_at" label="最后更新" width="180" class-name="no-print-col" />
-
-        <el-table-column label="操作" width="150" fixed="right" align="center" class-name="no-print-col">
+        <el-table-column v-if="!isPrinting" label="操作" width="140" fixed="right" align="center">
           <template #default="scope">
             <div v-if="scope.row.status === 'DRAFT'">
               <el-button type="primary" link size="small" @click="handleEdit(scope.row)" icon="Edit">修改</el-button>
-              <el-popconfirm title="确定要撤销这条暂存成绩吗？" @confirm="handleRevoke(scope.row)" confirm-button-text="确认撤销" cancel-button-text="取消">
+              <el-popconfirm title="确定要撤销这条暂存成绩吗？" @confirm="handleRevoke(scope.row)" confirm-button-text="确认" cancel-button-text="取消">
                 <template #reference>
                   <el-button type="danger" link size="small" icon="Delete">撤销</el-button>
                 </template>
@@ -114,14 +165,7 @@
       </div>
     </el-card>
 
-    <el-dialog
-        v-model="editDialogVisible"
-        title="修改成绩记录"
-        width="650px"
-        @close="resetEditForm"
-        class="custom-dialog no-print"
-        destroy-on-close>
-
+    <el-dialog v-model="editDialogVisible" title="修改成绩记录" width="650px" @close="resetEditForm" class="custom-dialog no-print" destroy-on-close>
       <el-descriptions :column="2" border size="small" class="mb-20">
         <el-descriptions-item label="姓名">{{ editForm.student_name }}</el-descriptions-item>
         <el-descriptions-item label="学号">{{ editForm.student_id }}</el-descriptions-item>
@@ -204,9 +248,16 @@
             <el-input-number v-model="editForm.makeupScore" :min="0" :max="100" :precision="1" size="large" style="width: 100%" @change="calculateTotal" />
           </el-form-item>
         </div>
-        <div class="total-bar">
-          <span class="txt">计算总评：</span>
-          <span class="num">{{ editForm.totalScore }}</span>
+
+        <div class="result-panel">
+          <div class="total-bar">
+            <span class="txt">计算总评：</span>
+            <span class="num">{{ editForm.totalScore || 0 }}</span>
+          </div>
+          <div class="gpa-bar">
+            <span class="txt">预估绩点 (5分制)：</span>
+            <span class="num gpa-num" :class="getGPAClass(editForm.gpa)">{{ editForm.gpa || '0.0' }}</span>
+          </div>
         </div>
       </el-form>
       <template #footer>
@@ -221,12 +272,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 import { Calendar, Search, Refresh, Edit, Lock, Delete, Printer, Warning } from '@element-plus/icons-vue'
 
-const queryForm = reactive({ semester: '', courseId: '' })
+const queryForm = reactive({ semester: '', courseId: '', examType: '', status: '' })
 const courses = ref([])
 const courseLoading = ref(false)
 const gradeList = ref([])
@@ -237,6 +288,7 @@ const total = ref(0)
 const editDialogVisible = ref(false)
 const editLoading = ref(false)
 const editFormRef = ref(null)
+const isPrinting = ref(false)
 
 const editForm = reactive({
   record_id: '', student_id: '', student_name: '', course_id: '', course_name: '', exam_type: '',
@@ -246,21 +298,41 @@ const editForm = reactive({
   experimentRatio: 0, experimentScore: null,
   midtermRatio: 0, midtermScore: null,
   finalRatio: 70, finalScore: null,
-  makeupScore: null, totalScore: null
+  makeupScore: null,
+  totalScore: null,
+  gpa: '0.0'
 })
 
-// [新增] 打印方法
-const printGradeList = () => {
-  window.print()
+// [核心] 格式化分数：NaN, Null, Empty 均显示为空字符串
+const formatScore = (val) => {
+  if (val === null || val === undefined || val === '' || String(val) === 'NaN' || val === '--') return ''
+  return val
 }
 
-// [新增] 获取课程名称用于打印头
+const printGradeList = () => {
+  isPrinting.value = true
+  nextTick(() => {
+    setTimeout(() => {
+      window.print()
+      isPrinting.value = false
+    }, 500)
+  })
+}
+
 const getCourseName = (id) => {
   const c = courses.value.find(c => c.course_id === id)
   return c ? c.course_name : id
 }
 
-// --- 以下逻辑保持原有功能 ---
+const calculateGPA = (score) => {
+  if (score == null || score === '') return '0.0'
+  const s = parseFloat(score)
+  if (isNaN(s)) return '0.0'
+  if (s < 60) return '0.0'
+  let gpa = (s - 50) / 10
+  if (gpa > 5.0) gpa = 5.0
+  return gpa.toFixed(1)
+}
 
 const isFormValid = computed(() => {
   if (editForm.exam_type === '补考') return editForm.makeupScore != null
@@ -268,8 +340,9 @@ const isFormValid = computed(() => {
 })
 
 const calculateTotal = () => {
+  let scoreVal = 0
   if (editForm.exam_type === '补考') {
-    editForm.totalScore = editForm.makeupScore
+    scoreVal = editForm.makeupScore || 0
   } else {
     let total = 0
     const add = (score, ratio) => {
@@ -283,8 +356,10 @@ const calculateTotal = () => {
     add(editForm.midtermScore, editForm.midtermRatio)
     add(editForm.dailyScore, editForm.dailyRatio)
     add(editForm.finalScore, editForm.finalRatio)
-    editForm.totalScore = Math.round(total * 10) / 10
+    scoreVal = Math.round(total * 10) / 10
   }
+  editForm.totalScore = scoreVal
+  editForm.gpa = calculateGPA(scoreVal)
 }
 
 const loadTeacherCourses = async () => {
@@ -298,7 +373,14 @@ const loadTeacherCourses = async () => {
 const handleQuery = async () => {
   loading.value = true
   try {
-    const params = { semester: queryForm.semester || undefined, courseId: queryForm.courseId || undefined, page: currentPage.value, pageSize: pageSize.value }
+    const params = {
+      semester: queryForm.semester || undefined,
+      courseId: queryForm.courseId || undefined,
+      examType: queryForm.examType || undefined,
+      status: queryForm.status || undefined,
+      page: currentPage.value,
+      pageSize: pageSize.value
+    }
     const res = await request.get('/remote/client/grade/view', { params })
     if (res.code === 200) {
       gradeList.value = res.data.list || []
@@ -309,15 +391,31 @@ const handleQuery = async () => {
   finally { loading.value = false }
 }
 
-const resetQuery = () => { queryForm.semester = ''; queryForm.courseId = ''; currentPage.value = 1; handleQuery() }
+const resetQuery = () => {
+  queryForm.semester = ''
+  queryForm.courseId = ''
+  queryForm.examType = ''
+  queryForm.status = ''
+  currentPage.value = 1
+  handleQuery()
+}
 const handleSizeChange = (val) => { pageSize.value = val; handleQuery() }
 const handleCurrentChange = (val) => { currentPage.value = val; handleQuery() }
 
 const getScoreClass = (score) => {
   if (!score) return ''
   const num = parseFloat(score)
+  if (num >= 90) return 'score-excellent'
   if (num < 60) return 'score-danger'
   return 'score-normal'
+}
+
+const getGPAClass = (gpa) => {
+  if (!gpa) return ''
+  const num = parseFloat(gpa)
+  if (num >= 4.0) return 'score-excellent'
+  if (num === 0) return 'score-danger'
+  return 'score-warning'
 }
 
 const resetEditForm = () => {
@@ -329,7 +427,8 @@ const resetEditForm = () => {
     experimentRatio: 0, experimentScore: null,
     midtermRatio: 0, midtermScore: null,
     finalRatio: 70, finalScore: null,
-    makeupScore: null, totalScore: null
+    makeupScore: null, totalScore: null,
+    gpa: '0.0'
   })
 }
 
@@ -342,6 +441,7 @@ const handleEdit = (row) => {
   editForm.course_name = row.course_name
   editForm.exam_type = row.exam_type
   editForm.status = row.status
+
   const parse = (val) => val ? parseFloat(val) : null
   editForm.attendanceScore = parse(row.attendance_score)
   editForm.homeworkScore = parse(row.homework_score)
@@ -351,6 +451,8 @@ const handleEdit = (row) => {
   editForm.finalScore = parse(row.final_score)
   editForm.makeupScore = parse(row.makeup_score)
   editForm.totalScore = parse(row.total_score)
+  editForm.gpa = calculateGPA(editForm.totalScore)
+
   editDialogVisible.value = true
 }
 
@@ -403,54 +505,52 @@ onMounted(() => { loadTeacherCourses(); handleQuery() })
 .list-card { border: none; }
 
 .score-danger { color: #f56c6c; font-weight: bold; }
+.score-excellent { color: #67c23a; font-weight: bold; }
+.score-warning { color: #e6a23c; font-weight: bold; }
 .score-normal { color: #606266; }
+.sub-score { color: #909399; font-size: 13px; }
 
 .pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 .mb-20 { margin-bottom: 20px; }
+.ml-2 { margin-left: 8px; }
 
-/* 弹窗样式 */
+.main-score { font-size: 14px; }
+.gpa-text { font-size: 13px; }
+
+/* 编辑弹窗样式 */
 .score-mini-card { background: #f9fafc; border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px; text-align: center; }
 .score-mini-card.highlight { background: #ecf5ff; border-color: #b3d8ff; }
 .score-mini-card .label { font-size: 12px; color: #909399; margin-bottom: 5px; }
 .flex-input { display: flex; align-items: center; justify-content: center; gap: 2px; }
 .sep { font-size: 12px; color: #c0c4cc; width: 15px;}
-.total-bar { margin-top: 20px; background: #f0f9eb; color: #67c23a; padding: 10px; border-radius: 4px; text-align: right; font-weight: bold; }
-.total-bar .num { font-size: 20px; }
 .makeup-mode { padding: 20px; background: #fdf6ec; border-radius: 4px; }
 
-/* ================== [核心] 打印专用样式 ================== */
+.result-panel { margin-top: 20px; background: #fcfcfc; border: 1px solid #ebeef5; border-radius: 4px; }
+.total-bar, .gpa-bar { padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+.total-bar { border-bottom: 1px dashed #ebeef5; background: #f0f9eb; color: #67c23a; }
+.gpa-bar { background: #fdf6ec; }
+.total-bar .num { font-size: 20px; font-weight: bold; }
+.gpa-bar .gpa-num { font-size: 18px; font-weight: bold; }
+
+/* 打印专用 */
 @media print {
-  /* 1. 隐藏多余元素：侧边栏、查询卡片、分页、操作列、按钮、弹窗 */
-  .no-print, .query-card, .pagination-wrapper, .header-actions, .el-dialog, .no-print-col {
-    display: none !important;
-  }
-
-  /* 隐藏表格的固定列（Element Plus固定列是独立的DOM，需要隐藏） */
+  .no-print, .query-card, .pagination-wrapper, .header-actions, .el-dialog, .no-print-col { display: none !important; }
   .el-table__fixed-right, .el-table__fixed { display: none !important; }
-
-  /* 2. 显示打印专用元素 */
   .show-in-print { display: block !important; }
 
-  /* 3. 布局调整：全屏显示表格 */
-  .grade-view {
-    position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 10px;
-    background: white; z-index: 9999;
-  }
-
-  /* 打印标题样式 */
+  .grade-view { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 10px; background: white; z-index: 9999; }
   .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-  .print-header h1 { font-size: 24px; margin: 0 0 10px 0; }
+  .print-header h1 { font-size: 24px; margin: 0 0 10px 0; font-family: "SimSun", serif; }
   .print-meta { display: flex; justify-content: space-between; font-size: 14px; }
 
-  /* 表格样式优化 */
   .el-card { box-shadow: none !important; border: none !important; }
-  .el-table { border: 1px solid #000 !important; font-size: 12px; width: 100% !important; }
-  .el-table th { background-color: #f5f5f5 !important; color: #000 !important; font-weight: bold; border-bottom: 1px solid #000 !important; }
-  .el-table td { border-bottom: 1px solid #000 !important; color: #000 !important; }
-  /* 去除表格滚动条 */
+  .el-table { border: 1px solid #000 !important; font-size: 12px; }
+  .el-table th { background-color: #f0f0f0 !important; color: #000 !important; border-bottom: 1px solid #000 !important; }
+  .el-table td { border-bottom: 1px solid #000 !important; color: #000 !important; padding: 4px 0 !important; }
   .el-table__body-wrapper { overflow: visible !important; height: auto !important; }
+  .print-table { zoom: 0.85; width: 100% !important; }
+  @page { size: landscape; margin: 10mm; }
 }
 
-/* 默认隐藏打印标题 */
 .show-in-print { display: none; }
 </style>

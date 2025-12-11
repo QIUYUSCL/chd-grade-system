@@ -21,18 +21,16 @@
             <el-col :span="8">
               <el-form-item label="课程" prop="courseId">
                 <el-select v-model="form.courseId" placeholder="选择课程" style="width: 100%" :loading="courseLoading">
-                  <el-option v-for="c in courses" :key="c.course_id" :label="c.course_name" :value="c.course_id" />
+                  <el-option v-for="c in courses" :key="c.course_id" :label="c.course_name" :value="c.course_id">
+                    <span style="float: left">{{ c.course_name }}</span>
+                    <span style="float: right; color: #ccc; font-size: 12px">{{ c.credit }}学分</span>
+                  </el-option>
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="8">
               <el-form-item label="学生学号" prop="studentId">
-                <el-input
-                    v-model="form.studentId"
-                    placeholder="输入学号"
-                    @blur="fetchStudentName"
-                    clearable
-                >
+                <el-input v-model="form.studentId" placeholder="输入学号" @blur="fetchStudentName" clearable>
                   <template #suffix>
                     <span v-if="form.studentName" style="color: #67c23a; font-weight: bold; margin-right: 5px">
                       {{ form.studentName }}
@@ -77,8 +75,14 @@
           </div>
 
           <div class="total-score-bar">
-            <span class="label">总评：</span>
-            <span class="value">{{ form.totalScore !== null ? form.totalScore : '--' }}</span>
+            <div class="score-group">
+              <span class="label">总评：</span>
+              <span class="value">{{ form.totalScore !== null ? form.totalScore : '--' }}</span>
+            </div>
+            <div class="score-group gpa-group">
+              <span class="label">绩点：</span>
+              <span class="value">{{ form.gpa }}</span>
+            </div>
           </div>
 
           <div class="form-actions">
@@ -121,15 +125,9 @@
         </div>
 
         <div class="batch-loader" style="margin: 20px 0; display: flex; gap: 10px; align-items: center;">
-          <el-button
-              type="primary"
-              @click="loadBatchStudents"
-              :loading="batchLoading"
-              :icon="Search"
-              :disabled="!form.courseId">
+          <el-button type="primary" @click="loadBatchStudents" :loading="batchLoading" :icon="Search" :disabled="!form.courseId">
             加载该课程选课学生
           </el-button>
-          <span class="tip-text">注意：请先在"选课管理"中为学生分配课程，此处才能加载出学生列表。</span>
         </div>
 
         <el-table :data="batchList" border stripe height="500" style="width: 100%" v-if="batchList.length > 0">
@@ -139,13 +137,7 @@
           <template v-if="form.examType === '正考'">
             <el-table-column v-for="item in activeScoreItems" :key="item.key" :label="`${item.label}(${form[item.ratioKey]}%)`" width="110" align="center">
               <template #default="{ row }">
-                <el-input-number
-                    v-model="row[item.scoreKey]"
-                    size="small"
-                    :min="0" :max="100" :precision="1" :controls="false"
-                    style="width: 100%"
-                    @change="calcRowTotal(row)"
-                />
+                <el-input-number v-model="row[item.scoreKey]" size="small" :min="0" :max="100" :precision="1" :controls="false" style="width: 100%" @change="calcRowTotal(row)" />
               </template>
             </el-table-column>
           </template>
@@ -158,11 +150,17 @@
             </el-table-column>
           </template>
 
-          <el-table-column label="总评" width="100" fixed="right" align="center">
+          <el-table-column label="总评" width="90" fixed="right" align="center">
             <template #default="{ row }">
               <span :style="{ fontWeight: 'bold', color: row.totalScore < 60 ? '#f56c6c' : '#67c23a' }">
                 {{ row.totalScore ?? '--' }}
               </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="绩点" width="80" fixed="right" align="center">
+            <template #default="{ row }">
+              <span style="color: #909399">{{ row.gpa ?? '0.0' }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -186,39 +184,33 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { EditPen, Refresh, Document, Select, Search } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
-// 全局状态
 const activeTab = ref('single')
 const loading = ref(false)
 const courseLoading = ref(false)
 const courses = ref([])
 const formRef = ref()
-
-// 批量状态
 const batchLoading = ref(false)
 const batchList = ref([])
 
-// 表单数据
 const form = reactive({
   semester: '2024-2025-1',
   courseId: '',
   studentId: '',
   studentName: '',
   examType: '正考',
-
   dailyRatio: 10,       dailyScore: null,
   attendanceRatio: 0, attendanceScore: null,
-  homeworkRatio: 20,   homeworkScore: null,
+  homeworkRatio: 0,   homeworkScore: null,
   experimentRatio: 0,  experimentScore: null,
-  midtermRatio: 0,     midtermScore: null,
+  midtermRatio: 20,     midtermScore: null,
   finalRatio: 70,      finalScore: null,
-
   makeupScore: null,
-  totalScore: null
+  totalScore: null,
+  gpa: '0.0' // [新增]
 })
 
-// 配置项
 const scoreConfigItems = [
-  { key: 'daily',  label: '平时成绩', ratioKey: 'dailyRatio',      scoreKey: 'dailyScore' },
+  { key: 'daily',  label: '平时', ratioKey: 'dailyRatio',      scoreKey: 'dailyScore' },
   { key: 'attend', label: '考勤', ratioKey: 'attendanceRatio', scoreKey: 'attendanceScore' },
   { key: 'hw',     label: '作业', ratioKey: 'homeworkRatio',   scoreKey: 'homeworkScore' },
   { key: 'exp',    label: '实验', ratioKey: 'experimentRatio', scoreKey: 'experimentScore' },
@@ -227,11 +219,7 @@ const scoreConfigItems = [
 ]
 
 const activeScoreItems = computed(() => scoreConfigItems.filter(item => form[item.ratioKey] > 0))
-
-const totalRatio = computed(() => {
-  if (form.examType === '补考') return 100
-  return scoreConfigItems.reduce((sum, item) => sum + (form[item.ratioKey] || 0), 0)
-})
+const totalRatio = computed(() => form.examType === '补考' ? 100 : scoreConfigItems.reduce((sum, item) => sum + (form[item.ratioKey] || 0), 0))
 
 const rules = {
   semester: [{ required: true, message: '必填', trigger: 'change' }],
@@ -239,118 +227,94 @@ const rules = {
   studentId: [{ required: true, message: '必填', trigger: 'blur' }]
 }
 
-// ---------------- 逻辑部分 ----------------
-
-// 将 calcScoreLogic 移动到最前面，确保被调用前已定义
-const calcScoreLogic = (dataContext, type) => {
-  if (type === '补考') {
-    return dataContext.makeupScore
-  } else {
-    let total = 0
-    scoreConfigItems.forEach(item => {
-      const score = dataContext[item.scoreKey]
-      // 始终取全局系数 form[item.ratioKey]
-      const ratio = form[item.ratioKey]
-      if (ratio > 0 && score != null) {
-        total += score * (ratio / 100)
-      }
-    })
-    return Math.round(total * 10) / 10
-  }
+// [新增] 绩点计算逻辑 (5分制)
+const calcGPA = (score) => {
+  if (score == null || score === '') return '0.0'
+  const s = parseFloat(score)
+  if (isNaN(s)) return '0.0'
+  if (s < 60) return '0.0'
+  // 绩点 = (分数 - 50) / 10
+  let gpa = (s - 50) / 10
+  if (gpa > 5.0) gpa = 5.0
+  return gpa.toFixed(1)
 }
 
-// 计算总分 (依赖 calcScoreLogic)
+const calcScoreLogic = (dataContext, type) => {
+  if (type === '补考') return dataContext.makeupScore
+  let total = 0
+  scoreConfigItems.forEach(item => {
+    const score = dataContext[item.scoreKey]
+    const ratio = form[item.ratioKey]
+    if (ratio > 0 && score != null) total += score * (ratio / 100)
+  })
+  return Math.round(total * 10) / 10
+}
+
 const calculateTotal = () => {
   form.totalScore = calcScoreLogic(form, form.examType)
+  form.gpa = calcGPA(form.totalScore) // [新增] 更新绩点
 }
 
-// 行计算 (依赖 calcScoreLogic)
 const calcRowTotal = (row) => {
   row.totalScore = calcScoreLogic(row, form.examType)
+  row.gpa = calcGPA(row.totalScore) // [新增] 更新行绩点
 }
 
-// 批量重算 (依赖 calcRowTotal)
 const recalcAllBatchRows = () => {
   batchList.value.forEach(row => calcRowTotal(row))
-  calculateTotal() // 同时也重算单条录入的总分
+  calculateTotal()
 }
 
-// Watchers (依赖 calculateTotal)
 watch(() => form.examType, () => calculateTotal(), { immediate: true })
 
-onMounted(async () => {
-  await loadTeacherCourses()
-})
+onMounted(() => loadTeacherCourses())
 
 const loadTeacherCourses = async () => {
   courseLoading.value = true
   try {
     const res = await request.get('/remote/client/teacher/courses')
     if (res.code === 200 && res.data) courses.value = res.data
-  } finally {
-    courseLoading.value = false
-  }
+  } finally { courseLoading.value = false }
 }
 
 const fetchStudentName = async () => {
   if (!form.studentId) return
   try {
     const res = await request.get('/remote/client/student/name', { params: { studentId: form.studentId } })
-    if (res.code === 200) {
-      form.studentName = res.data
-    } else {
-      form.studentName = '未找到'
-    }
-  } catch (e) {
-    form.studentName = '查询失败'
-  }
+    form.studentName = res.code === 200 ? res.data : '未找到'
+  } catch { form.studentName = '查询失败' }
 }
 
 const loadBatchStudents = async () => {
   if (!form.courseId) return ElMessage.warning('请先选择课程')
   batchLoading.value = true
   try {
-    const res = await request.get('/remote/client/course/students', {
-      params: { courseId: form.courseId, semester: form.semester }
-    })
+    const res = await request.get('/remote/client/course/students', { params: { courseId: form.courseId, semester: form.semester } })
     if (res.code === 200) {
       batchList.value = res.data.map(stu => ({
         ...stu,
-        // 初始化所有分项
         attendanceScore: null, homeworkScore: null, experimentScore: null,
         midtermScore: null, dailyScore: null, finalScore: null,
-        makeupScore: null, totalScore: null
+        makeupScore: null, totalScore: null, gpa: '0.0'
       }))
-      if (batchList.value.length === 0) ElMessage.warning('该课程暂无学生选课')
+      if (!batchList.value.length) ElMessage.warning('该课程暂无学生选课')
       else ElMessage.success(`加载了 ${batchList.value.length} 名学生`)
-    } else {
-      ElMessage.error(res.message)
-    }
-  } catch (e) {
-    ElMessage.error(e.message)
-  } finally {
-    batchLoading.value = false
-  }
+    } else ElMessage.error(res.message)
+  } catch (e) { ElMessage.error(e.message) }
+  finally { batchLoading.value = false }
 }
 
-const handleSubmit = async (status) => {
-  await submitSingle(status)
-}
+const handleSubmit = async (status) => submitSingle(status)
 
 const submitSingle = async (status) => {
   if (form.examType === '正考' && totalRatio.value !== 100) return ElMessage.warning('系数和非100%')
-
   await formRef.value.validate()
   loading.value = true
   try {
     const payload = buildPayload(form, status)
     const res = await request.post('/remote/client/grade/entry', payload)
-    if (res.code === 200) {
-      ElMessage.success('成功')
-      handleReset()
-    } else {
-      ElMessage.error(res.message)
-    }
+    if (res.code === 200) { ElMessage.success('成功'); handleReset() }
+    else ElMessage.error(res.message)
   } catch(e) { ElMessage.error(e.message) }
   finally { loading.value = false }
 }
@@ -358,67 +322,37 @@ const submitSingle = async (status) => {
 const submitBatch = async (status) => {
   if (!form.courseId) return ElMessage.warning('请选择课程')
   if (form.examType === '正考' && totalRatio.value !== 100) return ElMessage.warning('系数和非100%')
-  if (batchList.value.length === 0) return ElMessage.warning('列表为空')
-
-  // 1. 过滤出有分数的行
   const validRows = batchList.value.filter(row => row.totalScore != null)
-  if (validRows.length === 0) return ElMessage.warning('没有检测到有效分数的记录')
+  if (!validRows.length) return ElMessage.warning('没有检测到有效分数的记录')
 
-  // 2. 根据状态显示不同的提示文案
   const actionName = status === 'DRAFT' ? '暂存' : '归档'
   const tips = status === 'SUBMITTED' ? '归档后将无法修改！' : '暂存后可随时修改。'
-
-  await ElMessageBox.confirm(
-      `确定要${actionName}这 ${validRows.length} 条成绩吗？${tips}`,
-      `批量${actionName}`,
-      { type: status === 'SUBMITTED' ? 'warning' : 'info' }
-  )
+  await ElMessageBox.confirm(`确定要${actionName}这 ${validRows.length} 条成绩吗？${tips}`, `批量${actionName}`, { type: status === 'SUBMITTED' ? 'warning' : 'info' })
 
   loading.value = true
   try {
-    // 3. 构建批量列表，传入对应的 status
     const grades = validRows.map(row => buildPayload(row, status))
-
     const res = await request.post('/remote/client/grade/batch-entry', { grades })
     if (res.code === 200) {
       ElMessage.success(`批量${actionName}成功`)
-      // 如果是归档，通常清空列表；如果是暂存，可以保留或也清空，视需求而定，这里为了方便继续操作不清空
       if (status === 'SUBMITTED') batchList.value = []
-    } else {
-      ElMessage.error(res.message)
-    }
-  } catch (e) {
-    if(e !== 'cancel') ElMessage.error(e.message)
-  } finally {
-    loading.value = false
-  }
+    } else ElMessage.error(res.message)
+  } catch (e) { if(e !== 'cancel') ElMessage.error(e.message) }
+  finally { loading.value = false }
 }
 
 const buildPayload = (source, status) => {
   const data = {
     studentId: source.student_id || source.studentId,
-    courseId: form.courseId,
-    semester: form.semester,
-    examType: form.examType,
-    status: status,
+    courseId: form.courseId, semester: form.semester, examType: form.examType, status: status,
     totalScore: source.totalScore?.toString()
   }
-
-  if (form.examType === '补考') {
-    if (source.makeupScore != null) data.makeupScore = source.makeupScore.toString()
-  } else {
-    scoreConfigItems.forEach(item => {
-      if (source[item.scoreKey] != null) data[item.scoreKey] = source[item.scoreKey].toString()
-    })
-  }
+  if (form.examType === '补考') { if (source.makeupScore != null) data.makeupScore = source.makeupScore.toString() }
+  else { scoreConfigItems.forEach(item => { if (source[item.scoreKey] != null) data[item.scoreKey] = source[item.scoreKey].toString() }) }
   return data
 }
 
-const handleReset = () => {
-  formRef.value.resetFields()
-  form.studentName = ''
-  form.totalScore = null
-}
+const handleReset = () => { formRef.value.resetFields(); form.studentName = ''; form.totalScore = null; form.gpa = '0.0' }
 </script>
 
 <style scoped>
@@ -440,13 +374,16 @@ const handleReset = () => {
   color: white; padding: 15px 25px; border-radius: 8px;
   display: flex; align-items: center; justify-content: flex-end; margin-top: 10px;
   box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
-  font-size: 18px; font-weight: bold;
+  gap: 30px; /* 增加间距 */
 }
 
-.form-actions { display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px; }
+.score-group { display: flex; align-items: center; }
+.score-group .label { font-size: 16px; margin-right: 5px; opacity: 0.9; }
+.score-group .value { font-size: 24px; font-weight: bold; font-family: 'DIN Alternate', sans-serif; }
+.gpa-group .value { color: #ffd700; } /* 绩点显示金黄色 */
 
+.form-actions { display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px; }
 .batch-header { margin-bottom: 20px; }
 .batch-footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
 .ratio-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; justify-content: space-between;}
-.tip-text { font-size: 12px; color: #909399; }
 </style>

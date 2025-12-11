@@ -153,11 +153,13 @@ public class RemoteClientService {
      * 查看成绩
      */
     @SuppressWarnings("unchecked")
-    public Map<String, Object> viewGrades(String teacherId, String semester, String courseId, int page, int pageSize, String clientIp) {
+    public Map<String, Object> viewGrades(String teacherId, String semester, String courseId, String examType, String status, int page, int pageSize, String clientIp) {
         Map<String, Object> conditions = new HashMap<>();
         conditions.put("teacher_id", teacherId);
         if (semester != null) conditions.put("semester", semester);
         if (courseId != null) conditions.put("course_id", courseId);
+        if (examType != null && !examType.isEmpty()) conditions.put("exam_type", examType);
+        if (status != null && !status.isEmpty()) conditions.put("status", status);
 
         OperationDTO queryDTO = new OperationDTO();
         queryDTO.setOperation("SELECT");
@@ -189,6 +191,15 @@ public class RemoteClientService {
             courseQuery.setConditions(Map.of("course_id", record.get("course_id")));
             Map<String, Object> course = (Map<String, Object>) restTemplate.postForObject(serverUrl + "/select", courseQuery, Map.class);
             record.put("course_name", course != null ? course.get("course_name") : "未知");
+
+            if (course != null) {
+                record.put("course_name", course.get("course_name"));
+                // 确保数据库 courses 表中有 credit 字段，如果没有则默认 3.0 或 0
+                record.put("credit", course.get("credit") != null ? course.get("credit") : 3.0);
+            } else {
+                record.put("course_name", "未知");
+                record.put("credit", 0);
+            }
         }
 
         int total = gradeList.size();
