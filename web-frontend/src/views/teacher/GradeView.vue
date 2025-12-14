@@ -415,7 +415,7 @@ const getGPAClass = (gpa) => {
   const num = parseFloat(gpa)
   if (num >= 4.0) return 'score-excellent'
   if (num === 0) return 'score-danger'
-  return 'score-warning'
+  return 'score-normal'
 }
 
 const resetEditForm = () => {

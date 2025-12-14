@@ -5,7 +5,6 @@
 
     <div class="login-content">
       <div class="login-header">
-        <img src="@/assets/logo.svg" alt="Logo" class="logo" />
         <h2 class="title">长安大学成绩管理系统</h2>
         <p class="subtitle">CHD Grade Management System</p>
       </div>

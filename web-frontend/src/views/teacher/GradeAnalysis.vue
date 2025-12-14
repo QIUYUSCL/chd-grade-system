@@ -418,7 +418,7 @@ const distributionTable = computed(() => {
   .chart-snapshot {
     display: block !important;
     width: 100% !important;
-    height: 290px !important; /* 压缩高度 */
+    height: 285px !important; /* 压缩高度 */
     object-fit: contain;
   }
 }
