@@ -15,4 +15,5 @@ public class OperationDTO {
     private Map<String, Object> data;       // 操作数据
     private Map<String, Object> conditions; // 查询条件
     private String role;        // 操作人角色
+
 }

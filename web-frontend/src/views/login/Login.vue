@@ -56,7 +56,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { loginApi } from '@/api/user'
 import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue' // 确保你安装了图标库
+import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -97,7 +97,8 @@ const handleLogin = async () => {
 
     const routes = {
       STUDENT: '/student/grades',
-      TEACHER: '/teacher/entry',
+      // ✅ [修改点] 将 TEACHER 跳转路径改为 dashboard
+      TEACHER: '/teacher/dashboard',
       ADMIN: '/admin/management'
     }
     ElMessage.success('登录成功，欢迎回来！')
@@ -118,12 +119,10 @@ const handleLogin = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* 更高级的渐变色 */
   background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
   overflow: hidden;
 }
 
-/* 装饰背景圆 */
 .circle {
   position: absolute;
   border-radius: 50%;
@@ -190,7 +189,6 @@ const handleLogin = async () => {
   opacity: 0.7;
 }
 
-/* 动画定义 */
 @keyframes slideDown {
   from { transform: translateY(-30px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }

@@ -4,16 +4,16 @@ server:
 spring:
   application:
     name: grade-server
-  datasource:
-    url: jdbc:mysql://localhost:3306/chd_grade_db?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: Scl03282219
-    driver-class-name: com.mysql.cj.jdbc.Driver
 #  datasource:
-#      url: jdbc:mysql://localhost:3306/chd_grade_db?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-#      username: chd_grade_db
-#      password: zeEwJTM4BxPrpHdX
-#      driver-class-name: com.mysql.cj.jdbc.Driver
+#    url: jdbc:mysql://localhost:3306/chd_grade_db?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+#    username: root
+#    password: Scl03282219
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+  datasource:
+      url: jdbc:mysql://localhost:3306/chd_grade_db?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+      username: chd_grade_db
+      password: zeEwJTM4BxPrpHdX
+      driver-class-name: com.mysql.cj.jdbc.Driver
 
 
 

@@ -29,22 +29,29 @@ public class PermissionInterceptor implements HandlerInterceptor {
         RequirePermission permission = handlerMethod.getMethodAnnotation(RequirePermission.class);
 
         if (permission == null) {
+            log.debug("无需权限验证: {}", request.getRequestURI());
             return true; // 无需权限验证
         }
 
         String token = request.getHeader("Authorization");
+        log.debug("权限验证开始 - URI: {}, Token存在: {}", request.getRequestURI(), token != null);
+        
         if (token == null || !token.startsWith("Bearer ")) {
+            log.warn("缺少认证令牌 - URI: {}", request.getRequestURI());
             sendError(response, "缺少认证令牌");
             return false;
         }
 
         token = token.substring(7);
+        log.debug("解析Token长度: {}", token.length());
 
         try {
             // ✅ 解析一次，复用结果
             var claims = jwtTokenUtil.parseToken(token);
             String role = (String) claims.get("role");
             String userId = (String) claims.get("userId");
+            
+            log.debug("Token解析成功 - userId: {}, role: {}", userId, role);
 
             // 检查角色权限
             String[] allowedRoles = permission.roles();
@@ -57,6 +64,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
             }
 
             if (!hasPermission) {
+                log.warn("权限不足 - userId: {}, role: {}, 需要角色: {}", userId, role, String.join(",", allowedRoles));
                 sendError(response, "权限不足，需要角色: " + String.join(",", allowedRoles));
                 return false;
             }
@@ -69,7 +77,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
             log.debug("权限验证通过 - userId: {}, role: {}, uri: {}", userId, role, request.getRequestURI());
             return true;
         } catch (Exception e) {
-            log.error("Token解析失败: {}", e.getMessage());
+            log.error("Token解析失败: {}", e.getMessage(), e);
             sendError(response, "无效的认证令牌: " + e.getMessage());
             return false;
         }

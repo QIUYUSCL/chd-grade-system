@@ -13,7 +13,6 @@ security:
   aes:
     secret-key: DqWW5+9DjS+rreSFA7MaiHiGfXUI9CjnrpHn5EJZtrA=
 
-
 remote:
   server:
     url: http://localhost:8081/rpc

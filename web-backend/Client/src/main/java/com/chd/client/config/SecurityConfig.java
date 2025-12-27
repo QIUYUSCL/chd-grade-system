@@ -39,9 +39,28 @@ public class SecurityConfig {
         config.addAllowedOrigin("http://www.testscl.xyz");
         config.addAllowedOrigin("http://8.218.190.69");
 
-        config.addAllowedOrigin("http://10.81.138.82:5174");
+        // 添加本地开发端口 - 扩展更多端口
+        config.addAllowedOrigin("http://localhost:3000");
+        config.addAllowedOrigin("http://localhost:3001");
+        config.addAllowedOrigin("http://localhost:4173");
+        config.addAllowedOrigin("http://localhost:5173");
         config.addAllowedOrigin("http://localhost:5174");
-        config.addAllowedMethod( "*" );
+        config.addAllowedOrigin("http://localhost:8080");
+        config.addAllowedOrigin("http://localhost:8081");
+        config.addAllowedOrigin("http://127.0.0.1:3000");
+        config.addAllowedOrigin("http://127.0.0.1:3001");
+        config.addAllowedOrigin("http://127.0.0.1:4173");
+        config.addAllowedOrigin("http://127.0.0.1:5173");
+        config.addAllowedOrigin("http://127.0.0.1:5174");
+        config.addAllowedOrigin("http://127.0.0.1:8080");
+        config.addAllowedOrigin("http://127.0.0.1:8081");
+        config.addAllowedOrigin("http://10.81.138.82:5174");
+
+        // 添加通配符支持（开发环境）
+        config.addAllowedOriginPattern("http://localhost:*");
+        config.addAllowedOriginPattern("http://127.0.0.1:*");
+
+        config.addAllowedMethod("*");
         config.addAllowedHeader("*");
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

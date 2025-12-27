@@ -24,9 +24,9 @@ public class JwtConfig {
         SecretKey key = Keys.hmacShaKeyFor(keyBytes); // 创建安全的密钥
 
         return Jwts.builder()
-                .setClaims(claims)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000))
+                .claims(claims)  // 使用新版本API
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration * 1000))
                 .signWith(key) // 使用密钥对象签名
                 .compact();
     }

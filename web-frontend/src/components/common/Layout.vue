@@ -19,10 +19,6 @@
               <span>{{ menu.label }}</span>
             </el-menu-item>
           </template>
-          <el-menu-item index="/teacher/analysis">
-            <el-icon><DataLine /></el-icon>
-            <span>成绩分析</span>
-          </el-menu-item>
           <el-menu-item index="/profile">
             <el-icon><User /></el-icon>
             <span>个人中心</span>
@@ -82,7 +78,11 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
-import {User, Key, SwitchButton, View, Edit, Setting, CaretBottom, DataLine} from '@element-plus/icons-vue'
+// ✅ [修改点] 引入 HomeFilled 图标
+import {
+  User, Key, SwitchButton, View, Edit, Setting, CaretBottom, DataLine, Pointer,
+  HomeFilled
+} from '@element-plus/icons-vue'
 import ChangePassword from '@/components/ChangePassword.vue'
 
 const router = useRouter()
@@ -107,12 +107,24 @@ const userInitial = computed(() => {
 
 const menuItems = computed(() => {
   const roleMenus = {
-    'STUDENT': [{ index: '/student/grades', label: '我的成绩', icon: View }],
-    'TEACHER': [
-      { index: '/teacher/entry', label: '成绩录入', icon: Edit },
-      { index: '/teacher/grade-view', label: '成绩管理', icon: View }
+    'STUDENT': [
+      { index: '/student/grades', label: '我的成绩', icon: View },
+      { index: '/student/course-selection', label: '选课界面', icon: Pointer }
     ],
-    'ADMIN': [{ index: '/admin/management', label: '系统概览', icon: Setting }, { index: '/admin/users', label: '用户管理', icon: User }]
+    'TEACHER': [
+      // ✅ [修改点] 添加教师工作台菜单项
+      { index: '/teacher/dashboard', label: '教师工作台', icon: HomeFilled },
+      { index: '/teacher/entry', label: '成绩录入', icon: Edit },
+      { index: '/teacher/grade-view', label: '成绩管理', icon: View },
+      { index: '/teacher/analysis', label: '成绩分析', icon: DataLine }
+    ],
+    'ADMIN': [
+      { index: '/admin/management', label: '系统概览', icon: Setting },
+      { index: '/admin/grade-management', label: '成绩录入管理', icon: Edit },
+      { index: '/admin/user-management', label: '人员组织库维护', icon: User },
+      { index: '/admin/course-management', label: '课程管理', icon: View },
+      { index: '/admin/security', label: '安全管理', icon: Key }
+    ]
   }
   return roleMenus[role.value] || []
 })
